@@ -5,10 +5,16 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../routing/route_names.dart';
+import '../../../../services/kyc_service.dart';
 import '../../providers/auth_provider.dart';
 
 class BiometricEnrollmentScreen extends ConsumerStatefulWidget {
-  const BiometricEnrollmentScreen({super.key});
+  final bool isMandatory;
+  
+  const BiometricEnrollmentScreen({
+    super.key,
+    this.isMandatory = false,
+  });
 
   @override
   ConsumerState<BiometricEnrollmentScreen> createState() =>
@@ -20,6 +26,21 @@ class _BiometricEnrollmentScreenState
   bool _isLoading = false;
   bool _isEnrolling = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Trigger biometric setup at the right lifecycle moment
+    if (widget.isMandatory) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndEnrollBiometric();
+      });
+    }
+  }
+
+  Future<void> _checkAndEnrollBiometric() async {
+    await _enrollBiometric();
+  }
+
   Future<void> _enrollBiometric() async {
     setState(() {
       _isLoading = true;
@@ -27,10 +48,45 @@ class _BiometricEnrollmentScreenState
     });
 
     try {
+      // print('[BIO] Starting enrollment');
+      
+      // KYC check - use robust method
+      if (!widget.isMandatory) {
+        final session = ref.read(authStateProvider).valueOrNull;
+        if (session == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Session expired. Please sign in again.'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+          return;
+        }
+        
+        final kycService = KYCService.instance;
+        final kycVerified = await kycService.isKYCVerified(session.id);
+        
+        if (!kycVerified) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('KYC verification required before enabling biometric login'),
+                backgroundColor: AppColors.warning,
+              ),
+            );
+            context.push(RouteNames.kycVerification);
+          }
+          return;
+        }
+      }
+
+      // print('[BIO] Calling enrollBiometric()');
       await ref.read(authNotifierProvider.notifier).enrollBiometric();
 
+      
       if (mounted) {
-        // Show success and navigate
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Biometric login enabled successfully!'),
@@ -40,10 +96,11 @@ class _BiometricEnrollmentScreenState
         _navigateToDashboard();
       }
     } catch (e) {
+      // print('[BIO] Enrollment failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(_extractErrorMessage(e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -60,6 +117,21 @@ class _BiometricEnrollmentScreenState
 
   void _skipBiometric() {
     _navigateToDashboard();
+  }
+
+  /// Extract user-friendly error message from exception
+  String _extractErrorMessage(Object error) {
+    String errorMessage = error.toString();
+    
+    // Remove common exception prefixes
+    final prefixes = ['Exception: ', 'AuthException: ', 'BiometricException: '];
+    for (final prefix in prefixes) {
+      if (errorMessage.startsWith(prefix)) {
+        return errorMessage.substring(prefix.length);
+      }
+    }
+    
+    return errorMessage;
   }
 
   void _navigateToDashboard() {
@@ -102,13 +174,13 @@ class _BiometricEnrollmentScreenState
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      AppColors.primary.withOpacity(0.15),
-                      AppColors.primaryLight.withOpacity(0.1),
+                      AppColors.primary.withValues(alpha: 0.15),
+                      AppColors.primaryLight.withValues(alpha: 0.1),
                     ],
                   ),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppColors.primary.withOpacity(0.3),
+                    color: AppColors.primary.withValues(alpha: 0.3),
                     width: 2,
                   ),
                 ),
@@ -165,7 +237,7 @@ class _BiometricEnrollmentScreenState
                 style: TextStyle(
                   fontSize: 15,
                   color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   height: 1.5,
                 ),
               ),
@@ -177,7 +249,7 @@ class _BiometricEnrollmentScreenState
                   color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Column(
@@ -270,14 +342,17 @@ class _BiometricEnrollmentScreenState
                                 ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: TextButton(
-                          onPressed: _isLoading ? null : _skipBiometric,
-                          child: const Text('Skip for now'),
+                      // Only show skip button if not mandatory
+                      if (!widget.isMandatory) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton(
+                            onPressed: _isLoading ? null : _skipBiometric,
+                            child: const Text('Skip for now'),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   );
                 },
@@ -305,7 +380,7 @@ class _BiometricEnrollmentScreenState
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
@@ -331,7 +406,7 @@ class _BiometricEnrollmentScreenState
                 style: TextStyle(
                   fontSize: 13,
                   color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
             ],

@@ -6,22 +6,31 @@ import '../features/auth/presentation/screens/role_selection_screen.dart';
 import '../features/auth/presentation/screens/sign_in_screen.dart';
 import '../features/auth/presentation/screens/sign_up_screen.dart';
 import '../features/auth/presentation/screens/biometric_enrollment_screen.dart';
+import '../features/auth/presentation/screens/kyc_verification_screen.dart';
+import '../features/auth/presentation/screens/device_management_screen.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/patient/presentation/screens/patient_dashboard_screen.dart';
-import '../features/patient/presentation/screens/patient_new_prescription_screen.dart';
+import '../features/patient/presentation/screens/add_prescription_screen.dart';
 import '../features/patient/presentation/screens/prescriptions_screen.dart';
 import '../features/patient/presentation/screens/qr_code_screen.dart';
 import '../features/patient/presentation/screens/medical_history_screen.dart';
 import '../features/patient/presentation/screens/privacy_settings_screen.dart';
 import '../features/doctor/presentation/screens/doctor_dashboard_screen.dart';
 import '../features/doctor/presentation/screens/patient_lookup_screen.dart';
+import '../features/doctor/presentation/screens/patient_record_screen.dart';
 import '../features/doctor/presentation/screens/prescription_history_screen.dart';
+import '../features/doctor/presentation/screens/new_prescription_screen.dart';
 import '../features/pharmacist/presentation/screens/pharmacist_dashboard_screen.dart';
 import '../features/pharmacist/presentation/screens/dispensing_history_screen.dart';
 import '../features/pharmacist/presentation/screens/dispense_screen.dart';
 import '../features/first_responder/presentation/screens/first_responder_dashboard_screen.dart';
 import '../features/first_responder/presentation/screens/qr_scanner_screen.dart';
 import '../features/first_responder/presentation/screens/emergency_data_screen.dart';
+import '../features/patient/presentation/screens/vitals_history_screen.dart';
+import '../features/patient/presentation/screens/book_appointment_screen.dart';
+import '../features/shared/presentation/screens/chat_list_screen.dart';
+import '../features/shared/presentation/screens/chat_room_screen.dart';
+import '../features/doctor/presentation/screens/manage_availability_screen.dart';
 import '../features/shared/presentation/screens/splash_screen.dart';
 import '../features/shared/presentation/screens/profile_screen.dart';
 import '../features/shared/presentation/screens/notifications_screen.dart';
@@ -49,7 +58,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       // Not authenticated - redirect to role selection (unless already on auth route)
       if (!isAuthenticated && !isAuthRoute && !isSplash) {
-        return RouteNames.roleSelection;
+        // Allow KYC and device management screens without auth
+        final isKYCRoute = state.matchedLocation == RouteNames.kycVerification;
+        final isDeviceRoute = state.matchedLocation == RouteNames.deviceManagement;
+
+        if (!isKYCRoute && !isDeviceRoute) {
+          return RouteNames.roleSelection;
+        }
       }
 
       // Authenticated but on auth route - redirect to appropriate dashboard
@@ -63,7 +78,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         final expectedPrefix = _rolePrefix(profile.role);
         final isCommonRoute = path == RouteNames.profile ||
             path == RouteNames.notifications ||
-            path == RouteNames.biometricEnrollment;
+            path == RouteNames.biometricEnrollment ||
+            path == RouteNames.kycVerification ||
+            path == RouteNames.deviceManagement;
 
         if (!isCommonRoute &&
             expectedPrefix != null &&
@@ -107,7 +124,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.biometricEnrollment,
         name: 'biometricEnrollment',
-        builder: (context, state) => const BiometricEnrollmentScreen(),
+        builder: (context, state) {
+          final isMandatory = state.extra as bool? ?? false;
+          return BiometricEnrollmentScreen(isMandatory: isMandatory);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.kycVerification,
+        name: 'kycVerification',
+        builder: (context, state) => const KYCVerificationScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.deviceManagement,
+        name: 'deviceManagement',
+        builder: (context, state) => const DeviceManagementScreen(),
       ),
 
       // Common Routes
@@ -136,7 +166,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.patientNewPrescription,
         name: 'patientNewPrescription',
-        builder: (context, state) => const PatientNewPrescriptionScreen(),
+        builder: (context, state) => const AddPrescriptionScreen(),
       ),
       GoRoute(
         path: RouteNames.patientQrCode,
@@ -149,9 +179,38 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MedicalHistoryScreen(),
       ),
       GoRoute(
+        path: '/patient/vitals-history',
+        name: 'patientVitalsHistory',
+        builder: (context, state) => const VitalsHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/patient/book-appointment',
+        name: 'patientBookAppointment',
+        builder: (context, state) => const BookAppointmentScreen(),
+      ),
+      GoRoute(
         path: RouteNames.patientPrivacy,
         name: 'patientPrivacy',
         builder: (context, state) => const PrivacySettingsScreen(),
+      ),
+      GoRoute(
+        path: '/patient/add-prescription',
+        name: 'patientAddPrescription',
+        builder: (context, state) => const AddPrescriptionScreen(),
+      ),
+      GoRoute(
+        path: '/chat-list',
+        name: 'chatList',
+        builder: (context, state) => const ChatListScreen(),
+      ),
+      GoRoute(
+        path: '/chat/:roomId',
+        name: 'chatRoom',
+        builder: (context, state) {
+          final roomId = state.pathParameters['roomId']!;
+          final otherName = state.extra as String? ?? 'Secure Chat';
+          return ChatRoomScreen(roomId: roomId, otherName: otherName);
+        },
       ),
 
       // Doctor Routes
@@ -161,9 +220,35 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const DoctorDashboardScreen(),
       ),
       GoRoute(
+        path: '/doctor/availability',
+        name: 'doctorAvailability',
+        builder: (context, state) => const ManageAvailabilityScreen(),
+      ),
+      GoRoute(
         path: RouteNames.doctorPatientLookup,
         name: 'doctorPatientLookup',
         builder: (context, state) => const PatientLookupScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.doctorPatientRecord,
+        name: 'doctorPatientRecord',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          final patientId = extras?['patientId'] as String? ?? '';
+          final patientName = extras?['patientName'] as String? ?? '';
+          return PatientRecordScreen(patientId: patientId, patientName: patientName);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.doctorNewPrescription,
+        name: 'doctorNewPrescription',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return NewPrescriptionScreen(
+            patientId: extras?['patientId'] ?? '',
+            patientName: extras?['patientName'] ?? '',
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.doctorHistory,
@@ -252,4 +337,3 @@ String? _rolePrefix(String role) {
       return null;
   }
 }
-
