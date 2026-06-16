@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -9,12 +10,25 @@ class BiometricService {
   final LocalAuthentication _localAuth = LocalAuthentication();
 
   /// Check if biometric authentication is available on this device
+  /// This checks both device support AND whether biometrics are enrolled
   Future<bool> isBiometricAvailable() async {
     try {
       final canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
       final canAuthenticate = await _localAuth.isDeviceSupported();
       return canAuthenticateWithBiometrics && canAuthenticate;
-    } on PlatformException {
+    } on PlatformException catch (e) {
+      debugPrint('[BIO] Error checking biometric availability: ${e.message}');
+      return false;
+    }
+  }
+
+  /// Check if device hardware supports biometrics (regardless of enrollment)
+  /// Use this for setup checks, not for blocking setup
+  Future<bool> isDeviceSupported() async {
+    try {
+      return await _localAuth.isDeviceSupported();
+    } on PlatformException catch (e) {
+      debugPrint('[BIO] Error checking device support: ${e.message}');
       return false;
     }
   }

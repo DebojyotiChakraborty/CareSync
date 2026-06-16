@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../routing/route_names.dart';
+import '../../../../services/auth_controller.dart';
 import '../../../auth/providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -50,25 +51,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     if (!mounted) return;
 
-    final authState = ref.read(authStateProvider);
-    final biometricEnabled = await ref.read(biometricEnabledProvider.future);
+    // Use AuthController for session restoration
+    final authController = AuthController.instance;
+    final result = await authController.restoreSession();
 
-    if (authState.valueOrNull != null) {
-      // User is authenticated
-      if (biometricEnabled) {
-        // Try biometric auth
-        final authNotifier = ref.read(authNotifierProvider.notifier);
-        final success = await authNotifier.signInWithBiometric();
-        if (success && mounted) {
-          _navigateToDashboard();
-          return;
-        }
-      }
-      // Go to dashboard (session still valid)
-      if (mounted) _navigateToDashboard();
-    } else {
-      // Not authenticated - go to role selection
-      if (mounted) context.go(RouteNames.roleSelection);
+    if (!mounted) return;
+
+    switch (result) {
+      case SessionRestoreResult.success:
+        // Session restored - navigating to dashboard
+        _navigateToDashboard();
+        break;
+      case SessionRestoreResult.biometricFailed:
+        // Biometric authentication failed
+        // Show error and go to login
+        context.go(RouteNames.roleSelection);
+        break;
+      case SessionRestoreResult.loginRequired:
+        // Login required
+        context.go(RouteNames.roleSelection);
+        break;
     }
   }
 
@@ -131,7 +133,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             borderRadius: BorderRadius.circular(30),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: Colors.black.withValues(alpha: 0.2),
                                 blurRadius: 20,
                                 offset: const Offset(0, 10),
                               ),
@@ -162,7 +164,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             fontFamily: 'Outfit',
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
                         const SizedBox(height: 48),
@@ -173,7 +175,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           child: CircularProgressIndicator(
                             strokeWidth: 2.5,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white.withOpacity(0.8),
+                              Colors.white.withValues(alpha: 0.8),
                             ),
                           ),
                         ),

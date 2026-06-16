@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../routing/route_names.dart';
+import '../../../../services/kyc_service.dart';
 import '../../models/patient_data.dart';
 import '../../providers/patient_provider.dart';
 
@@ -26,34 +29,86 @@ class MedicalHistoryScreen extends ConsumerWidget {
       ),
       body: conditionsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: AppSpacing.screenPadding,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: AppColors.error.withOpacity(0.5),
+        error: (error, _) {
+          // Check if error is due to KYC requirement using typed exception
+          if (error is KYCRequiredException) {
+            return Center(
+              child: Padding(
+                padding: AppSpacing.screenPadding,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.verified_user_outlined,
+                      size: 80,
+                      color: AppColors.warning.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'KYC Verification Required',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'You need to verify your identity before accessing medical records',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => context.push(RouteNames.kycVerification),
+                      icon: const Icon(Icons.badge_rounded),
+                      label: const Text('Verify Identity'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Error loading medical history',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+            );
+          }
+          
+          return Center(
+            child: Padding(
+              padding: AppSpacing.screenPadding,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: AppColors.error.withValues(alpha: 0.5),
                   ),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => ref.invalidate(medicalConditionsProvider),
-                  child: const Text('Retry'),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading medical history',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => ref.invalidate(medicalConditionsProvider),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
         data: (conditions) {
           if (conditions.isEmpty) {
             return _buildEmptyState(context, ref);
@@ -81,7 +136,7 @@ class MedicalHistoryScreen extends ConsumerWidget {
             Icon(
               Icons.medical_information_outlined,
               size: 80,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
             ),
             const SizedBox(height: 24),
             Text(
@@ -89,7 +144,7 @@ class MedicalHistoryScreen extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 8),
@@ -98,7 +153,7 @@ class MedicalHistoryScreen extends ConsumerWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
               ),
             ),
             const SizedBox(height: 24),
@@ -131,7 +186,7 @@ class MedicalHistoryScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _getTypeColor(type).withOpacity(0.1),
+                    color: _getTypeColor(type).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -148,7 +203,7 @@ class MedicalHistoryScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _getSeverityColor(severity).withOpacity(0.1),
+                      color: _getSeverityColor(severity).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -183,7 +238,7 @@ class MedicalHistoryScreen extends ConsumerWidget {
                   isPublic ? 'Visible to first responders' : 'Private',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
                 const Spacer(),
@@ -358,7 +413,7 @@ class MedicalHistoryScreen extends ConsumerWidget {
     bool isPublic,
   ) async {
     try {
-      // Get patient data from provider
+      // Get patient data from providers
       final patientData = await ref.read(patientDataProvider.future);
       if (patientData == null) {
         throw Exception('Patient profile not found');

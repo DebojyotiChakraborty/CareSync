@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Singleton service for Supabase database operations
@@ -18,7 +19,6 @@ class SupabaseService {
 
   Stream<AuthState> get authStateChanges => auth.onAuthStateChange;
 
-  /// Sign up with email and password
   Future<AuthResponse> signUp({
     required String email,
     required String password,
@@ -31,7 +31,6 @@ class SupabaseService {
     );
   }
 
-  /// Sign in with email and password
   Future<AuthResponse> signIn({
     required String email,
     required String password,
@@ -42,7 +41,6 @@ class SupabaseService {
     );
   }
 
-  /// Sign out
   Future<void> signOut() async {
     await auth.signOut();
   }
@@ -51,20 +49,16 @@ class SupabaseService {
   // PROFILE OPERATIONS
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Get current user's profile
   Future<Map<String, dynamic>?> getProfile() async {
     if (currentUserId == null) return null;
-
     final response = await client
         .from('profiles')
         .select()
         .eq('id', currentUserId!)
         .maybeSingle();
-
     return response;
   }
 
-  /// Create or update user profile
   Future<void> upsertProfile(Map<String, dynamic> data) async {
     await client.from('profiles').upsert({
       'id': currentUserId,
@@ -74,112 +68,132 @@ class SupabaseService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // DEVICE OPERATIONS
+  // PATIENT OPERATIONS
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Register a new device for biometric auth
-  Future<void> registerDevice({
-    required String deviceId,
-    required String deviceName,
-    required String platform,
-  }) async {
-    await client.from('user_devices').insert({
-      'user_id': currentUserId,
-      'device_id': deviceId,
-      'device_name': deviceName,
-      'platform': platform,
-      'enrolled_at': DateTime.now().toIso8601String(),
-      'last_used_at': DateTime.now().toIso8601String(),
-      'is_active': true,
-    });
-  }
-
-  /// Update device last used timestamp
-  Future<void> updateDeviceLastUsed(String deviceId) async {
-    await client
-        .from('user_devices')
-        .update({'last_used_at': DateTime.now().toIso8601String()})
-        .eq('device_id', deviceId)
-        .eq('user_id', currentUserId!);
-  }
-
-  /// Get all devices for current user
-  Future<List<Map<String, dynamic>>> getUserDevices() async {
-    final response = await client
-        .from('user_devices')
-        .select()
-        .eq('user_id', currentUserId!)
-        .eq('is_active', true)
-        .order('last_used_at', ascending: false);
-
-    return List<Map<String, dynamic>>.from(response);
-  }
-
-  /// Deactivate a device
-  Future<void> deactivateDevice(String deviceId) async {
-    await client
-        .from('user_devices')
-        .update({'is_active': false})
-        .eq('device_id', deviceId)
-        .eq('user_id', currentUserId!);
-  }
+  // ... inside SupabaseService class ...
 
   // ─────────────────────────────────────────────────────────────────────────
   // PATIENT OPERATIONS
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Get patient data for current user (auto-creates if doesn't exist)
-  Future<Map<String, dynamic>?> getPatientData() async {
-    if (currentUserId == null) return null;
+  Future<Map<String, dynamic>?> getPatientData({String? userId}) async {
+    final targetId = userId ?? currentUserId;
+    if (targetId == null) return null;
 
-    // Try to get existing patient record
-    var response = await client
-        .from('patients')
-        .select()
-        .eq('user_id', currentUserId!)
-        .maybeSingle();
+    try {
+      // FIX: Changed 'patient_data' to 'patients'
+      var response = await client
+          .from('patients')
+          .select()
+          .eq('user_id', targetId)
+          .maybeSingle();
 
-    // If no patient record exists, create one
-    if (response == null) {
-      try {
-        response = await client
-            .from('patients')
-            .insert({'user_id': currentUserId})
-            .select()
-            .single();
-      } catch (e) {
-        // If insert fails (e.g., RLS), try to get again (might have been created)
-        response = await client
-            .from('patients')
-            .select()
-            .eq('user_id', currentUserId!)
-            .maybeSingle();
+      if (response == null) {
+        try {
+          // FIX: Changed 'patient_data' to 'patients'
+          response = await client
+              .from('patients')
+              .insert({'user_id': targetId})
+              .select()
+              .single();
+        } catch (insertError) {
+          // FIX: Changed 'patient_data' to 'patients'
+          response = await client
+              .from('patients')
+              .select()
+              .eq('user_id', targetId)
+              .maybeSingle();
+        }
       }
+
+      return response;
+    } catch (e) {
+      return null;
     }
-
-    return response;
-  }
-  
-  /// Ensure patient record exists for current user
-  Future<String?> ensurePatientExists() async {
-    final data = await getPatientData();
-    return data?['id'] as String?;
   }
 
-  /// Create or update patient data
-  Future<void> upsertPatientData(Map<String, dynamic> data) async {
+  Future<void> upsertPatientData(Map<String, dynamic> data, {String? userId}) async {
+    final targetId = userId ?? currentUserId;
+    if (targetId == null) return;
+
+    // FIX: Changed 'patient_data' to 'patients'
     await client.from('patients').upsert({
-      'user_id': currentUserId,
+      'user_id': targetId,
       ...data,
       'updated_at': DateTime.now().toIso8601String(),
     });
+  }
+
+  /// Update face scan URL and embedding vector for the patient
+  Future<void> updatePatientFaceEmbedding({
+    required String faceScanUrl,
+    required List<double> embedding,
+  }) async {
+    final userId = currentUserId;
+    if (userId == null) return;
+    
+    await client.from('patients').update({
+      'face_scan_url': faceScanUrl,
+      'face_embedding': embedding,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('user_id', userId);
+  }
+
+  /// Search for a matching patient record by face embedding vector using Supabase RPC
+  Future<Map<String, dynamic>?> matchPatientByFace({
+    required List<double> embedding,
+    double maxDistance = 0.6,
+  }) async {
+    try {
+      final response = await client.rpc(
+        'match_patient_by_face',
+        params: {
+          'query_embedding': embedding,
+          'max_distance': maxDistance,
+        },
+      );
+
+      if (response is List && response.isNotEmpty) {
+        return Map<String, dynamic>.from(response.first);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[SUPABASE] Face matching RPC error: $e');
+      return null;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // STORAGE OPERATIONS (NEW)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Uploads a file to Supabase Storage and returns the Public URL
+  Future<String?> uploadFile({
+    required String bucket,
+    required String path,
+    required Uint8List fileBytes,
+    required String contentType,
+  }) async {
+    try {
+      await client.storage.from(bucket).uploadBinary(
+        path,
+        fileBytes,
+        fileOptions: FileOptions(contentType: contentType, upsert: true),
+      );
+
+      final publicUrl = client.storage.from(bucket).getPublicUrl(path);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error uploading file: $e');
+      return null;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
   // PRESCRIPTION OPERATIONS
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Get prescriptions for a patient
   Future<List<Map<String, dynamic>>> getPatientPrescriptions(
       String patientId) async {
     final response = await client
@@ -191,7 +205,30 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
-  /// Create a new prescription
+  /// NEW: Get prescriptions created by the current doctor in the last 3 days
+  Future<List<Map<String, dynamic>>> getDoctorRecentPrescriptions() async {
+    if (currentUserId == null) return [];
+
+    final threeDaysAgo = DateTime.now().subtract(const Duration(days: 3));
+
+    // We join 'patients' to get the patient reference,
+    // then nested join 'profiles' (via patient's user_id) to get the name.
+    final response = await client
+        .from('prescriptions')
+        .select('''
+          *,
+          patient:patients!patient_id(
+            user_id,
+            profiles:profiles!user_id(full_name)
+          )
+        ''')
+        .eq('doctor_id', currentUserId!)
+        .gte('created_at', threeDaysAgo.toIso8601String())
+        .order('created_at', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response);
+  }
+
   Future<Map<String, dynamic>> createPrescription({
     required String patientId,
     required String diagnosis,
@@ -199,22 +236,22 @@ class SupabaseService {
     bool isPublic = false,
     bool patientEntered = false,
     required List<Map<String, dynamic>> items,
+    Map<String, dynamic>? metadata,
   }) async {
-    // Create prescription
     final prescription = await client
         .from('prescriptions')
         .insert({
-          'patient_id': patientId,
-          'doctor_id': patientEntered ? null : currentUserId,
-          'diagnosis': diagnosis,
-          'notes': notes,
-          'is_public': isPublic,
-          'patient_entered': patientEntered,
-        })
+      'patient_id': patientId,
+      'doctor_id': patientEntered ? null : currentUserId,
+      'diagnosis': diagnosis,
+      'notes': notes,
+      'is_public': isPublic,
+      'patient_entered': patientEntered,
+      'metadata': metadata,
+    })
         .select()
         .single();
 
-    // Add prescription items
     final prescriptionId = prescription['id'];
     for (final item in items) {
       await client.from('prescription_items').insert({
@@ -227,10 +264,9 @@ class SupabaseService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // DISPENSING OPERATIONS
+  // DISPENSING & OTHER OPERATIONS
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Record a dispensing transaction
   Future<void> recordDispensing({
     required String prescriptionId,
     required String patientId,
@@ -245,14 +281,7 @@ class SupabaseService {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // EMERGENCY ACCESS (PUBLIC DATA)
-  // ─────────────────────────────────────────────────────────────────────────
-
-  /// Get public emergency data for a patient by QR code ID
-  /// Returns formatted data for emergency display
   Future<Map<String, dynamic>?> getEmergencyData(String qrCodeId) async {
-    // Get patient with profile and public conditions
     final patientData = await client
         .from('patients')
         .select('''
@@ -269,14 +298,12 @@ class SupabaseService {
     final patientId = patientData['id'];
     final profile = patientData['profiles'] as Map<String, dynamic>?;
 
-    // Get public medical conditions
     final conditions = await client
         .from('medical_conditions')
         .select('condition_type, description, severity')
         .eq('patient_id', patientId)
         .eq('is_public', true);
 
-    // Get active public prescription medications
     final prescriptions = await client
         .from('prescriptions')
         .select('prescription_items(medicine_name, dosage, frequency)')
@@ -284,7 +311,6 @@ class SupabaseService {
         .eq('is_public', true)
         .eq('status', 'active');
 
-    // Flatten medications from all prescriptions
     final medications = <Map<String, dynamic>>[];
     for (final rx in prescriptions) {
       final items = rx['prescription_items'] as List? ?? [];
@@ -297,7 +323,6 @@ class SupabaseService {
       }
     }
 
-    // Return formatted data
     return {
       'patient': {
         'full_name': profile?['full_name'],
@@ -313,52 +338,53 @@ class SupabaseService {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // STATS HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
-
-  /// Get today's prescription count for a doctor
   Future<int> getTodaysPrescriptionCount() async {
     if (currentUserId == null) return 0;
-    
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
-    
     final result = await client
         .from('prescriptions')
         .select('id')
         .eq('doctor_id', currentUserId!)
         .gte('created_at', startOfDay.toIso8601String());
-    
     return (result as List).length;
   }
 
-  /// Get total prescription count for a doctor
   Future<int> getTotalPrescriptionCount() async {
     if (currentUserId == null) return 0;
-    
     final result = await client
         .from('prescriptions')
         .select('id')
         .eq('doctor_id', currentUserId!);
-    
     return (result as List).length;
   }
 
-  /// Get today's dispensing count for a pharmacist
+
   Future<int> getTodaysDispensingCount() async {
     if (currentUserId == null) return 0;
-    
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
-    
     final result = await client
         .from('dispensing_records')
         .select('id')
         .eq('pharmacist_id', currentUserId!)
         .gte('dispensed_at', startOfDay.toIso8601String());
-    
     return (result as List).length;
   }
-}
 
+  Future<void> registerDevice({
+    required String deviceId,
+    required String deviceName,
+    required String platform,
+  }) async {
+    await client.from('user_devices').insert({
+      'user_id': currentUserId,
+      'device_id': deviceId,
+      'device_name': deviceName,
+      'platform': platform,
+      'enrolled_at': DateTime.now().toIso8601String(),
+      'last_used_at': DateTime.now().toIso8601String(),
+      'is_active': true,
+    });
+  }
+}

@@ -6,6 +6,9 @@ abstract class RouteNames {
   static const String signIn = '/sign-in';
   static const String signUp = '/sign-up';
   static const String biometricEnrollment = '/biometric-enrollment';
+  static const String kycVerification = '/kyc-verification';
+  static const String twoFactorVerification = '/two-factor-verification';
+  static const String deviceManagement = '/device-management';
 
   // Common/Shared
   static const String profile = '/profile';
@@ -19,10 +22,12 @@ abstract class RouteNames {
   static const String patientProfile = '/patient/profile';
   static const String patientPrivacy = '/patient/privacy';
   static const String patientNewPrescription = '/patient/new-prescription';
+  static const String patientAddPrescription = '/patient/add-prescription';
 
   // Doctor
   static const String doctorDashboard = '/doctor';
   static const String doctorPatientLookup = '/doctor/patient-lookup';
+  static const String doctorPatientRecord = '/doctor/patient-record';
   static const String doctorNewPrescription = '/doctor/new-prescription';
   static const String doctorHistory = '/doctor/history';
   static const String doctorScanQr = '/doctor/scan-qr';
