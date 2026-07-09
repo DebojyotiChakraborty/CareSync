@@ -6,6 +6,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 
+import '../../../../core/theme/app_tokens.dart';
+
 /// Navigation item data for [CSFloatingNavBar].
 class CSNavItem {
   final IconData icon;
@@ -112,10 +114,11 @@ class _CSFloatingNavBarState extends State<CSFloatingNavBar>
     final double totalW =
         _activeW + (_inactiveW * (widget.items.length - 1)) + (_hPad * 2);
 
-    // CareSync brand palette
-    const Color pillBg = Color(0xFF121212); // Dark charcoal pill
-    const Color activeColor = Colors.white;
-    const Color inactiveColor = Color(0xFF9BA3AF);
+    // Flat design palette — accent pill, token-driven so it works in dark mode.
+    final t = context.tokens;
+    final Color pillBg = t.accent;
+    final Color activeColor = t.accentOn;
+    final Color inactiveColor = t.textSecondary;
 
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -163,8 +166,9 @@ class _CSFloatingNavBarState extends State<CSFloatingNavBar>
                           color: pillBg,
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
+                            // Sanctioned accent-glow (pill is accent-filled).
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.18),
+                              color: pillBg.withValues(alpha: 0.35),
                               blurRadius: 14,
                               offset: const Offset(0, 5),
                             ),
@@ -256,8 +260,7 @@ class _CSFloatingNavBarState extends State<CSFloatingNavBar>
                                                 const SizedBox(width: 6),
                                                 Text(
                                                   item.label,
-                                                  style:
-                                                      GoogleFonts.plusJakartaSans(
+                                                  style: GoogleFonts.dmSans(
                                                     fontSize: 10.5,
                                                     fontWeight: FontWeight.w700,
                                                     color: activeColor,
@@ -296,33 +299,16 @@ class _GlassBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     return ClipRRect(
       borderRadius: BorderRadius.circular(36),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(36),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.72),
-                Colors.white.withOpacity(0.42),
-              ],
-            ),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.65),
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 28,
-                spreadRadius: 0,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            color: t.card.withValues(alpha: t.glassAlpha),
+            border: Border.all(color: t.outline, width: 1),
           ),
         ),
       ),
