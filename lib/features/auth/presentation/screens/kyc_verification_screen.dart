@@ -8,6 +8,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../routing/route_names.dart';
 import '../../../../services/kyc_service.dart';
 import '../../../../services/supabase_service.dart';
+import '../../providers/auth_provider.dart';
+import '../../../patient/providers/patient_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'premium_face_scan_screen.dart';
 import 'package:path_provider/path_provider.dart';
@@ -340,6 +342,12 @@ class _KYCVerificationScreenState extends ConsumerState<KYCVerificationScreen> {
       } catch (e) {
         debugPrint('[KYC] Failed to clean up biometric cache: $e');
       }
+
+      // Refresh cached KYC status so the profile badge / dashboard reflect the
+      // newly verified state. Without this, kycStatusProvider keeps serving the
+      // stale pre-verification value and the app still shows "unverified".
+      ref.invalidate(kycStatusProvider);
+      ref.invalidate(isKycVerifiedProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
