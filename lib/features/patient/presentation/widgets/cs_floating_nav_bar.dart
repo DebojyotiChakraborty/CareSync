@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../../core/theme/app_tokens.dart';
@@ -260,7 +259,8 @@ class _CSFloatingNavBarState extends State<CSFloatingNavBar>
                                                 const SizedBox(width: 6),
                                                 Text(
                                                   item.label,
-                                                  style: GoogleFonts.dmSans(
+                                                  style: TextStyle(
+                                                    fontFamily: 'DM Sans',
                                                     fontSize: 10.5,
                                                     fontWeight: FontWeight.w700,
                                                     color: activeColor,

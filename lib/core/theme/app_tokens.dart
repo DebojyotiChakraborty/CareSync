@@ -1,8 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 import 'app_spacing.dart';
+
+// Bundled font families (declared in pubspec) — no runtime fetch.
+TextStyle _dmSans({
+  double? fontSize,
+  FontWeight? fontWeight,
+  double? letterSpacing,
+  Color? color,
+}) =>
+    TextStyle(
+      fontFamily: 'DM Sans',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      letterSpacing: letterSpacing,
+      color: color,
+    );
+
+TextStyle _dmMono({
+  double? fontSize,
+  FontWeight? fontWeight,
+  double? letterSpacing,
+  Color? color,
+}) =>
+    TextStyle(
+      fontFamily: 'DM Mono',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      letterSpacing: letterSpacing,
+      color: color,
+    );
 
 /// Design tokens that have no direct Material [ColorScheme] / [TextTheme] slot.
 ///
@@ -75,28 +103,28 @@ class AppTokens extends ThemeExtension<AppTokens> {
     skeleton: AppColors.skeletonLight,
     tint: AppColors.accentColor.withValues(alpha: 0.1),
     glassAlpha: 0.85,
-    appBarTitle: GoogleFonts.dmSans(
+    appBarTitle: _dmSans(
       fontSize: 22,
       fontWeight: FontWeight.w900,
       color: AppColors.textPrimaryLight,
     ),
-    sheetTitle: GoogleFonts.dmSans(
+    sheetTitle: _dmSans(
       fontSize: 20,
       fontWeight: FontWeight.w700,
       color: AppColors.textPrimaryLight,
     ),
-    monoSectionHeader: GoogleFonts.dmMono(
+    monoSectionHeader: _dmMono(
       fontSize: 12,
       fontWeight: FontWeight.w400,
       letterSpacing: 0.5,
       color: AppColors.accentColor,
     ),
-    monoMeta: GoogleFonts.dmMono(
+    monoMeta: _dmMono(
       fontSize: 12,
       fontWeight: FontWeight.w400,
       color: AppColors.textSecondaryLight,
     ),
-    monoMenuItem: GoogleFonts.dmMono(
+    monoMenuItem: _dmMono(
       fontSize: 15,
       fontWeight: FontWeight.w500,
       color: AppColors.textPrimaryLight,
@@ -116,28 +144,28 @@ class AppTokens extends ThemeExtension<AppTokens> {
     skeleton: AppColors.skeletonDark,
     tint: AppColors.accentColor.withValues(alpha: 0.2),
     glassAlpha: 0.85,
-    appBarTitle: GoogleFonts.dmSans(
+    appBarTitle: _dmSans(
       fontSize: 22,
       fontWeight: FontWeight.w900,
       color: AppColors.textPrimaryDark,
     ),
-    sheetTitle: GoogleFonts.dmSans(
+    sheetTitle: _dmSans(
       fontSize: 20,
       fontWeight: FontWeight.w700,
       color: AppColors.textPrimaryDark,
     ),
-    monoSectionHeader: GoogleFonts.dmMono(
+    monoSectionHeader: _dmMono(
       fontSize: 12,
       fontWeight: FontWeight.w400,
       letterSpacing: 0.5,
       color: AppColors.accentColor,
     ),
-    monoMeta: GoogleFonts.dmMono(
+    monoMeta: _dmMono(
       fontSize: 12,
       fontWeight: FontWeight.w400,
       color: AppColors.textSecondaryDark,
     ),
-    monoMenuItem: GoogleFonts.dmMono(
+    monoMenuItem: _dmMono(
       fontSize: 15,
       fontWeight: FontWeight.w500,
       color: AppColors.textPrimaryDark,

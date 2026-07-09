@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 import 'app_spacing.dart';
@@ -10,10 +9,25 @@ import 'app_tokens.dart';
 class AppTheme {
   AppTheme._();
 
+  // Bundled font families (declared in pubspec) — no runtime fetch.
+  static TextStyle _dmSans({
+    double? fontSize,
+    FontWeight? fontWeight,
+    double? letterSpacing,
+    Color? color,
+  }) =>
+      TextStyle(
+        fontFamily: 'DM Sans',
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        letterSpacing: letterSpacing,
+        color: color,
+      );
+
   // ───────────────────────── Type scale (DM Sans) ──────────────────────────
   static TextTheme _appTextTheme(Color color) {
     TextStyle s(double size, FontWeight weight, double spacing) =>
-        GoogleFonts.dmSans(
+        _dmSans(
           fontSize: size,
           fontWeight: weight,
           letterSpacing: spacing,
@@ -91,7 +105,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
         iconTheme: IconThemeData(color: textPrimary),
-        titleTextStyle: GoogleFonts.dmSans(
+        titleTextStyle: _dmSans(
           fontSize: 22,
           fontWeight: FontWeight.w900,
           color: textPrimary,
@@ -125,7 +139,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
           borderSide: const BorderSide(color: AppColors.accentColor, width: 1.5),
         ),
-        hintStyle: GoogleFonts.dmSans(color: textSecondary),
+        hintStyle: _dmSans(color: textSecondary),
       ),
 
       filledButtonTheme: FilledButtonThemeData(
@@ -136,7 +150,7 @@ class AppTheme {
           minimumSize: const Size(0, 52),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           shape: const StadiumBorder(),
-          textStyle: GoogleFonts.dmSans(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: _dmSans(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
 
@@ -147,7 +161,7 @@ class AppTheme {
           minimumSize: const Size(0, 52),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           shape: const StadiumBorder(),
-          textStyle: GoogleFonts.dmSans(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: _dmSans(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
 
@@ -160,7 +174,7 @@ class AppTheme {
           minimumSize: const Size(0, 52),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           shape: const StadiumBorder(),
-          textStyle: GoogleFonts.dmSans(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: _dmSans(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
 
@@ -171,7 +185,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           side: BorderSide(color: outline),
           shape: const StadiumBorder(),
-          textStyle: GoogleFonts.dmSans(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: _dmSans(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
 
