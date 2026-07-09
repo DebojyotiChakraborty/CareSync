@@ -13,6 +13,9 @@ import '../../../../services/kyc_service.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/secure_storage_service.dart';
 import '../../../auth/providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../../../core/design/minimal_sheet_dialog.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../models/user_profile.dart';
 
 // Provider for doctor signature status
@@ -174,6 +177,11 @@ class ProfileScreen extends ConsumerWidget {
                         ],
 
                         _buildSettingsTile(
+                          icon: Iconsax.moon,
+                          title: 'Appearance',
+                          onTap: () => _showThemePicker(context, ref),
+                        ),
+                        _buildSettingsTile(
                           icon: Iconsax.lock,
                           title: 'Change Password',
                           onTap: () {},
@@ -199,6 +207,46 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   // --- WIDGET BUILDERS ---
+
+  void _showThemePicker(BuildContext context, WidgetRef ref) {
+    final current = ref.read(themeModeProvider);
+    showAppSheet(
+      context,
+      builder: (ctx) {
+        final t = ctx.tokens;
+        final textTheme = Theme.of(ctx).textTheme;
+        Widget option(String label, IconData icon, ThemeMode mode) {
+          final selected = mode == current;
+          return ListTile(
+            leading: Icon(icon, color: selected ? t.accent : t.textPrimary),
+            title: Text(label, style: textTheme.titleMedium),
+            trailing: selected ? Icon(Icons.check, color: t.accent) : null,
+            onTap: () {
+              ref.read(themeModeProvider.notifier).setMode(mode);
+              Navigator.of(ctx).pop();
+            },
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text('Appearance', style: t.sheetTitle),
+              ),
+              option('System', Iconsax.mobile, ThemeMode.system),
+              option('Light', Iconsax.sun_1, ThemeMode.light),
+              option('Dark', Iconsax.moon, ThemeMode.dark),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildVerificationBadge(BuildContext context, bool isVerified) {
     if (isVerified) {
