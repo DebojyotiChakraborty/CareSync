@@ -176,8 +176,6 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                         ),
                         Row(
                           children: [
-                            _buildHeaderIcon(Iconsax.message, () => context.push('/chat-list')),
-                            const SizedBox(width: 8),
                             _buildHeaderIcon(Iconsax.notification, () => context.push(RouteNames.notifications)),
                           ],
                         ),

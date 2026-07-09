@@ -389,39 +389,6 @@ class _PatientEmergencyScreenState extends ConsumerState<PatientEmergencyScreen>
                         color: const Color(0xFF64748B),
                         onTap: () => context.push(RouteNames.patientQrCode),
                       ),
-                      const SizedBox(height: 32),
-
-                      // ── Section 2: First Aid Quick Guide ───────────────────
-                      Text(
-                        'First Aid Quick Guide',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF121212),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      _buildGuideTile(
-                        context,
-                        title: 'CPR (Cardiopulmonary Resuscitation)',
-                        details: 'Place hands in center of chest. Push hard and fast (100-120 compressions/min). Give 2 rescue breaths after every 30 compressions.',
-                        icon: Iconsax.heart_tick,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildGuideTile(
-                        context,
-                        title: 'Choking (Heimlich Maneuver)',
-                        details: 'Stand behind the person. Wrap arms around waist. Make a fist and press hard into the abdomen with quick, upward thrusts.',
-                        icon: Iconsax.warning_2,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildGuideTile(
-                        context,
-                        title: 'Severe Bleeding Control',
-                        details: 'Apply firm, direct pressure to the wound with a clean cloth. Elevate the injured area. Use a tourniquet if bleeding is life-threatening.',
-                        icon: Iconsax.danger,
-                      ),
                     ],
                   ),
                 ),
@@ -608,53 +575,6 @@ class _PatientEmergencyScreenState extends ConsumerState<PatientEmergencyScreen>
                 color: Color(0xFF94A3B8), size: 18),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildGuideTile(
-    BuildContext context, {
-    required String title,
-    required String details,
-    required IconData icon,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: const Color(0xFFEF4444), size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF121212),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  details,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: const Color(0xFF64748B),
-                    height: 1.45,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

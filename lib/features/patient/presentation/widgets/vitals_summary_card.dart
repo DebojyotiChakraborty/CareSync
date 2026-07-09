@@ -3,11 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../providers/vitals_provider.dart';
-import '../../providers/health_sync_provider.dart';
 import '../../models/vital.dart';
 import 'add_vital_bottom_sheet.dart';
 import '../../../../services/encryption_service.dart';
-import 'health_trackers_sheet.dart';
 import '../../../../core/widgets/loading_skeleton.dart';
 
 class VitalsSummaryCard extends ConsumerWidget {
@@ -16,121 +14,15 @@ class VitalsSummaryCard extends ConsumerWidget {
   void _showVitalOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder:
-          (context) => Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-            ),
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Log Vital Data',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF121212),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFFF4F0),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.favorite_rounded,
-                      color: Color(0xFFFF5200),
-                    ),
-                  ),
-                  title: Text(
-                    'Sync Wearable (Whoop, Apple Health, Fit)',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13.5,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Stream live biometrics from fitness bands',
-                    style: GoogleFonts.plusJakartaSans(fontSize: 11),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => const HealthTrackersSheet(),
-                    );
-                  },
-                ),
-                const Divider(height: 16),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF1F5F9),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.edit_note_rounded,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                  title: Text(
-                    'Log Manually',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13.5,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Manually type current vital metrics',
-                    style: GoogleFonts.plusJakartaSans(fontSize: 11),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => const AddVitalBottomSheet(),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
+      builder: (context) => const AddVitalBottomSheet(),
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final vitalsAsync = ref.watch(patientVitalsProvider);
-    final syncState = ref.watch(healthSyncProvider);
-    final isSynced = syncState.connectedSources.isNotEmpty;
-    final syncedSource = isSynced ? syncState.connectedSources.first : '';
-
     return vitalsAsync.when(
       data: (vitalsList) {
         // 1. Heart Rate
@@ -148,102 +40,68 @@ class VitalsSummaryCard extends ConsumerWidget {
         final weightPrev = _getPrevious(vitalsList, 'weight');
         final weightTrend = _calculateWeightTrend(weightLatest, weightPrev);
 
-        // Derive current display value depending on sync state
+        // Derive current display value from the latest manually-logged vital
         final String hrVal;
-        if (isSynced) {
-          hrVal = syncState.liveHeartRate > 0
-              ? syncState.liveHeartRate.toString()
-              : 'No wearable data available.';
+        if (hrLatest?.value != null) {
+          String val = hrLatest!.value;
+          try {
+            val = EncryptionService.instance.decryptDeterministic(
+              encryptedData: hrLatest.value,
+              patientId: hrLatest.patientId,
+            );
+          } catch (_) {}
+          hrVal = val;
         } else {
-          if (hrLatest?.value != null) {
-            String val = hrLatest!.value;
-            try {
-              val = EncryptionService.instance.decryptDeterministic(
-                encryptedData: hrLatest.value,
-                patientId: hrLatest.patientId,
-              );
-            } catch (_) {}
-            hrVal = val;
-          } else {
-            hrVal = 'No wearable data available.';
-          }
+          hrVal = 'No data logged yet.';
         }
         final hrLabel =
-            isSynced
-                ? '${syncedSource.replaceAll('_', ' ').toUpperCase()} (LIVE)'
-                : (hrLatest != null ? (hrTrend['text'] as String) : 'No Data');
-        final hrColor =
-            isSynced
-                ? const Color(0xFFFF5200)
-                : (hrLatest != null
-                    ? (hrTrend['color'] as Color)
-                    : AppColors.textSub);
+            hrLatest != null ? (hrTrend['text'] as String) : 'No Data';
+        final hrColor = hrLatest != null
+            ? (hrTrend['color'] as Color)
+            : AppColors.textSub;
 
         final String bpVal;
-        if (isSynced) {
-          bpVal = syncState.liveBloodPressure != 'Not Available'
-              ? syncState.liveBloodPressure
-              : 'No wearable data available.';
+        if (bpLatest?.value != null) {
+          String val = bpLatest!.value;
+          try {
+            val = EncryptionService.instance.decryptDeterministic(
+              encryptedData: bpLatest.value,
+              patientId: bpLatest.patientId,
+            );
+          } catch (_) {}
+          bpVal = val;
         } else {
-          if (bpLatest?.value != null) {
-            String val = bpLatest!.value;
-            try {
-              val = EncryptionService.instance.decryptDeterministic(
-                encryptedData: bpLatest.value,
-                patientId: bpLatest.patientId,
-              );
-            } catch (_) {}
-            bpVal = val;
-          } else {
-            bpVal = 'No wearable data available.';
-          }
+          bpVal = 'No data logged yet.';
         }
         final bpLabel =
-            isSynced
-                ? 'LIVE'
-                : (bpLatest != null ? (bpTrend['text'] as String) : 'No Data');
-        final bpColor =
-            isSynced
-                ? const Color(0xFF60A5FA)
-                : (bpLatest != null
-                    ? (bpTrend['color'] as Color)
-                    : AppColors.textSub);
+            bpLatest != null ? (bpTrend['text'] as String) : 'No Data';
+        final bpColor = bpLatest != null
+            ? (bpTrend['color'] as Color)
+            : AppColors.textSub;
 
         final String weightVal;
-        if (isSynced) {
-          weightVal = syncState.liveWeight > 0
-              ? syncState.liveWeight.toString()
-              : 'No wearable data available.';
+        if (weightLatest?.value != null) {
+          String val = weightLatest!.value;
+          try {
+            val = EncryptionService.instance.decryptDeterministic(
+              encryptedData: weightLatest.value,
+              patientId: weightLatest.patientId,
+            );
+          } catch (_) {}
+          weightVal = val;
         } else {
-          if (weightLatest?.value != null) {
-            String val = weightLatest!.value;
-            try {
-              val = EncryptionService.instance.decryptDeterministic(
-                encryptedData: weightLatest.value,
-                patientId: weightLatest.patientId,
-              );
-            } catch (_) {}
-            weightVal = val;
-          } else {
-            weightVal = 'No wearable data available.';
-          }
+          weightVal = 'No data logged yet.';
         }
-        final weightLabel =
-            isSynced
-                ? 'LIVE'
-                : (weightLatest != null
-                    ? (weightTrend['text'] as String)
-                    : 'No Data');
-        final weightColor =
-            isSynced
-                ? const Color(0xFF34D399)
-                : (weightLatest != null
-                    ? (weightTrend['color'] as Color)
-                    : AppColors.textSub);
+        final weightLabel = weightLatest != null
+            ? (weightTrend['text'] as String)
+            : 'No Data';
+        final weightColor = weightLatest != null
+            ? (weightTrend['color'] as Color)
+            : AppColors.textSub;
 
-        final bool showNoDataNotice = hrVal == 'No wearable data available.' ||
-            bpVal == 'No wearable data available.' ||
-            weightVal == 'No wearable data available.';
+        final bool showNoDataNotice = hrVal == 'No data logged yet.' ||
+            bpVal == 'No data logged yet.' ||
+            weightVal == 'No data logged yet.';
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,14 +110,11 @@ class VitalsSummaryCard extends ConsumerWidget {
               children: [
                 _buildVitalCard(
                   context,
-                  iconWidget:
-                      isSynced
-                          ? const BeatingHeartIcon(color: Color(0xFFF472B6))
-                          : const Icon(
-                            Icons.favorite_rounded,
-                            size: 14,
-                            color: Color(0xFFF472B6),
-                          ),
+                  iconWidget: const Icon(
+                    Icons.favorite_rounded,
+                    size: 14,
+                    color: Color(0xFFF472B6),
+                  ),
                   value: hrVal,
                   unit: 'bpm',
                   label: 'Heart Rate',
@@ -319,7 +174,7 @@ class VitalsSummaryCard extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'No wearable data available.',
+                        'Tap a card to log your vitals manually.',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 11,
                           color: const Color(0xFF64748B),
@@ -358,7 +213,7 @@ class VitalsSummaryCard extends ConsumerWidget {
     required Color trendColor,
     required VoidCallback onTap,
   }) {
-    final bool isNoData = value == 'No wearable data available.';
+    final bool isNoData = value == 'No data logged yet.';
     final String displayValue = isNoData ? '--' : value;
     final String displayUnit = isNoData ? '' : unit;
 
@@ -528,46 +383,5 @@ class VitalsSummaryCard extends ConsumerWidget {
     } catch (_) {
       return {'text': 'Stable', 'color': AppColors.textSub};
     }
-  }
-}
-
-class BeatingHeartIcon extends StatefulWidget {
-  final Color color;
-  const BeatingHeartIcon({super.key, required this.color});
-
-  @override
-  State<BeatingHeartIcon> createState() => _BeatingHeartIconState();
-}
-
-class _BeatingHeartIconState extends State<BeatingHeartIcon>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.3,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: Icon(Icons.favorite_rounded, size: 14, color: widget.color),
-    );
   }
 }

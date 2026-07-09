@@ -11,7 +11,7 @@ import 'dart:io';
 import '../../../../features/shared/services/ocr_service.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../family/providers/family_provider.dart';
+import '../../../auth/providers/auth_provider.dart';
 import '../../models/prescription_input_models.dart';
 import '../../providers/patient_provider.dart';
 import '../widgets/doctor_info_card_widget.dart';
@@ -432,7 +432,7 @@ class _AddPrescriptionScreenState extends ConsumerState<AddPrescriptionScreen> {
         String errorMsg = e.toString().replaceAll("Exception:", "").trim();
         // Friendly error message for RLS issues
         if (errorMsg.contains('policy') || errorMsg.contains('permission')) {
-          errorMsg = 'Permission denied. Please ask your administrator to run the Family SQL Policies.';
+          errorMsg = 'Permission denied. You may not have access to modify this record.';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -497,7 +497,7 @@ class _AddPrescriptionScreenState extends ConsumerState<AddPrescriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profile = ref.watch(activeContextProfileProvider);
+    final profile = ref.watch(currentProfileProvider);
     final patient = ref.watch(patientDataProvider);
 
     return Scaffold(

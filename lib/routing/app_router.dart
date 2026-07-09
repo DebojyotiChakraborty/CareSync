@@ -31,8 +31,6 @@ import '../features/emergency/presentation/screens/emergency_data_screen.dart';
 import '../features/emergency/presentation/screens/emergency_access_history_screen.dart';
 import '../features/patient/presentation/screens/vitals_history_screen.dart';
 import '../features/patient/presentation/screens/book_appointment_screen.dart';
-import '../features/shared/presentation/screens/chat_list_screen.dart';
-import '../features/shared/presentation/screens/chat_room_screen.dart';
 import '../features/doctor/presentation/screens/manage_availability_screen.dart';
 import '../features/shared/presentation/screens/splash_screen.dart';
 import '../features/shared/presentation/screens/profile_screen.dart';
@@ -107,9 +105,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path == RouteNames.notifications ||
             path == RouteNames.biometricEnrollment ||
             path == RouteNames.kycVerification ||
-            path == RouteNames.deviceManagement ||
-            path == '/chat-list' ||
-            path.startsWith('/chat/');
+            path == RouteNames.deviceManagement;
 
         if (!isCommonRoute &&
             expectedPrefix != null &&
@@ -180,22 +176,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'notifications',
         builder: (context, state) => const NotificationsScreen(),
       ),
-      // Chat routes — shared across patient, doctor, pharmacist
-      GoRoute(
-        path: '/chat-list',
-        name: 'chatList',
-        builder: (context, state) => const ChatListScreen(),
-      ),
-      GoRoute(
-        path: '/chat/:roomId',
-        name: 'chatRoom',
-        builder: (context, state) {
-          final roomId = state.pathParameters['roomId']!;
-          final otherName = state.extra as String? ?? 'Secure Chat';
-          return ChatRoomScreen(roomId: roomId, otherName: otherName);
-        },
-      ),
-
       // ── Patient Shell (persistent floating nav bar across 4 main tabs) ──
       ShellRoute(
         builder: (context, state, child) => PatientShellScreen(child: child),

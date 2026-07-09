@@ -13,8 +13,6 @@ import '../../../../services/kyc_service.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/secure_storage_service.dart';
 import '../../../auth/providers/auth_provider.dart';
-import '../../../family/presentation/screens/family_members_screen.dart';
-import '../../../family/providers/family_provider.dart';
 import '../../models/user_profile.dart';
 
 // Provider for doctor signature status
@@ -27,13 +25,8 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profileAsync = ref.watch(activeContextProfileProvider);
-    final authUser = ref.watch(authStateProvider).valueOrNull;
-    final activeId = ref.watch(activeProfileIdProvider);
-    final isUsingFamilyAccount = authUser != null && activeId != authUser.id;
-
+    final profileAsync = ref.watch(currentProfileProvider);
     final kycAsync = ref.watch(kycStatusProvider);
-    final familyMembersAsync = ref.watch(familyMembersProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA), // Parchment surface background
@@ -69,10 +62,6 @@ class ProfileScreen extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Family Account Banner
-                  if (isUsingFamilyAccount)
-                    _buildFamilyBanner(context, ref, profile),
-
                   // Custom App Bar
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -120,11 +109,11 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _buildVerificationBadge(context, isVerified, isUsingFamilyAccount),
+                        _buildVerificationBadge(context, isVerified),
                         const SizedBox(height: 16),
 
                         // Inline Mini-Stats Row (Patient only)
-                        if (profile.isPatient && !isUsingFamilyAccount) ...[
+                        if (profile.isPatient) ...[
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -133,21 +122,6 @@ class ProfileScreen extends ConsumerWidget {
                                 value: '2',
                                 icon: Iconsax.mobile,
                                 onTap: () => context.push(RouteNames.deviceManagement),
-                              ),
-                              Container(
-                                width: 1,
-                                height: 16,
-                                color: const Color(0xFFE2E8F0),
-                                margin: const EdgeInsets.symmetric(horizontal: 20),
-                              ),
-                              _buildMiniStatItem(
-                                label: 'Dependents',
-                                value: familyMembersAsync.valueOrNull?.length.toString() ?? '0',
-                                icon: Iconsax.people,
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const FamilyMembersScreen()),
-                                ),
                               ),
                             ],
                           ),
@@ -171,90 +145,50 @@ class ProfileScreen extends ConsumerWidget {
                     const SizedBox(height: 28),
                   ],
 
-                  // Settings / Actions List
-                  if (!isUsingFamilyAccount) ...[
-                    // Switch Account Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          side: const BorderSide(color: Color(0xFFE2E8F0)),
-                          backgroundColor: Colors.white,
-                          elevation: 0,
-                        ),
-                        icon: Icon(Iconsax.arrow_swap, color: const Color(0xFF121212), size: 16),
-                        label: Text(
-                          'Switch Profile View',
-                          style: GoogleFonts.plusJakartaSans(
-                            color: const Color(0xFF121212),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                        onPressed: () {
-                          _showAccountSwitcher(context, ref, familyMembersAsync);
-                        },
-                      ),
+                  // Settings Heading
+                  Text(
+                    'Account Settings',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF121212),
                     ),
-                    const SizedBox(height: 24),
+                  ),
+                  const SizedBox(height: 12),
 
-                    // Settings Heading
-                    Text(
-                      'Account Settings',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF121212),
-                      ),
+                  // Settings list items container
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    const SizedBox(height: 12),
-
-                    // Settings list items container
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Column(
-                        children: [
-                          if (profile.isPatient) ...[
-                            _buildSettingsTile(
-                              icon: Iconsax.people,
-                              title: 'Family & Dependents',
-                              onTap: () => Navigator.push(
-                                context,
-                                  MaterialPageRoute(builder: (_) => const FamilyMembersScreen()),
-                              ),
-                            ),
-                            _buildSettingsTile(
-                              icon: Iconsax.security_safe,
-                              title: 'Privacy & Security Settings',
-                              onTap: () => context.push(RouteNames.patientPrivacy),
-                            ),
-                          ],
-
+                    child: Column(
+                      children: [
+                        if (profile.isPatient) ...[
                           _buildSettingsTile(
-                            icon: Iconsax.lock,
-                            title: 'Change Password',
-                            onTap: () {},
-                          ),
-                          _buildSettingsTile(
-                            icon: Iconsax.logout,
-                            title: 'Sign Out',
-                            isDestructive: true,
-                            onTap: () {
-                              ref.read(authNotifierProvider.notifier).signOut();
-                            },
+                            icon: Iconsax.security_safe,
+                            title: 'Privacy & Security Settings',
+                            onTap: () => context.push(RouteNames.patientPrivacy),
                           ),
                         ],
-                      ),
+
+                        _buildSettingsTile(
+                          icon: Iconsax.lock,
+                          title: 'Change Password',
+                          onTap: () {},
+                        ),
+                        _buildSettingsTile(
+                          icon: Iconsax.logout,
+                          title: 'Sign Out',
+                          isDestructive: true,
+                          onTap: () {
+                            ref.read(authNotifierProvider.notifier).signOut();
+                          },
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ],
               );
             },
@@ -266,7 +200,7 @@ class ProfileScreen extends ConsumerWidget {
 
   // --- WIDGET BUILDERS ---
 
-  Widget _buildVerificationBadge(BuildContext context, bool isVerified, bool isUsingFamilyAccount) {
+  Widget _buildVerificationBadge(BuildContext context, bool isVerified) {
     if (isVerified) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -295,7 +229,7 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     return GestureDetector(
-      onTap: isUsingFamilyAccount ? null : () => context.push(RouteNames.kycVerification),
+      onTap: () => context.push(RouteNames.kycVerification),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
@@ -427,45 +361,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildFamilyBanner(BuildContext context, WidgetRef ref, UserProfile profile) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      margin: const EdgeInsets.only(bottom: 24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121212),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(Iconsax.arrow_swap, color: Colors.white, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Viewing Family Profile', style: GoogleFonts.plusJakartaSans(color: Colors.white70, fontSize: 11)),
-                Text(
-                  profile.fullName,
-                  style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-              ],
-            ),
-          ),
-          TextButton.icon(
-            onPressed: () => ref.read(familyControllerProvider.notifier).switchAccount(null),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.white.withValues(alpha: 0.12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            icon: const Icon(Icons.close, size: 14),
-            label: Text('Exit', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAvatar(UserProfile profile, bool isVerified) {
     return Container(
       width: 90,
@@ -488,79 +383,6 @@ class ProfileScreen extends ConsumerWidget {
       child: profile.avatarUrl == null
           ? const Icon(Iconsax.user, size: 36, color: Color(0xFF94A3B8))
           : null,
-    );
-  }
-
-  void _showAccountSwitcher(BuildContext context, WidgetRef ref, AsyncValue<List<dynamic>> membersAsync) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Iconsax.arrow_swap, color: const Color(0xFFFF5200)),
-                const SizedBox(width: 12),
-                Text(
-                  'Switch Active Profile',
-                  style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF121212)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            membersAsync.when(
-              data: (members) {
-                if (members.isEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      "No linked family accounts yet.",
-                      style: GoogleFonts.plusJakartaSans(fontSize: 14, color: const Color(0xFF64748B)),
-                    ),
-                  );
-                }
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    ActionChip(
-                      backgroundColor: const Color(0xFFFAFAFA),
-                      avatar: const Icon(Iconsax.user, size: 14),
-                      label: Text('Primary Account', style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600)),
-                      onPressed: () {
-                        ref.read(familyControllerProvider.notifier).switchAccount(null);
-                        Navigator.pop(context);
-                      },
-                    ),
-                    ...members.map((member) => ActionChip(
-                      backgroundColor: const Color(0xFFFAFAFA),
-                      avatar: CircleAvatar(
-                        backgroundColor: const Color(0xFFFF5200),
-                        child: Text(
-                          member.profile.fullName[0].toUpperCase(),
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      label: Text(member.profile.fullName, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
-                      onPressed: () {
-                        ref.read(familyControllerProvider.notifier).switchAccount(member.profile.id);
-                        Navigator.pop(context);
-                      },
-                    )),
-                  ],
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF121212))),
-              error: (_,__) => Text("Error loading linked profiles", style: GoogleFonts.plusJakartaSans(color: const Color(0xFFEF4444))),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

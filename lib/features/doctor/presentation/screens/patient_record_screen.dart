@@ -73,16 +73,6 @@ class PatientRecordScreen extends ConsumerWidget {
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Iconsax.message_2, color: kTextPrimary, size: 20),
-            onPressed: () {
-              // Navigate to chat with patient
-              context.push('/chat-list');
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
         shape: const Border(
           bottom: BorderSide(color: kBorderColor, width: 1),
         ),

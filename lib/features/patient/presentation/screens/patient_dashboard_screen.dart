@@ -5,8 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../../routing/route_names.dart';
-import '../../../family/providers/family_provider.dart';
-import '../widgets/family_member_list.dart';
+import '../../../auth/providers/auth_provider.dart';
 import '../widgets/daily_medication_schedule.dart';
 import '../widgets/vitals_summary_card.dart';
 import '../../../shared/presentation/widgets/appointment_list_widget.dart';
@@ -145,7 +144,7 @@ class _PatientDashboardScreenState extends ConsumerState<PatientDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final profile = ref.watch(activeContextProfileProvider);
+    final profile = ref.watch(currentProfileProvider);
     final isKycVerifiedAsyncValue = ref.watch(isKycVerifiedProvider);
     final isKycVerified = isKycVerifiedAsyncValue.valueOrNull ?? false;
 
@@ -232,20 +231,6 @@ class _PatientDashboardScreenState extends ConsumerState<PatientDashboardScreen>
                               ],
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () => context.push('/chat-list'),
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: const Color(0xFFE5E7EB)),
-                              ),
-                              child: const Icon(Iconsax.message_2, color: Color(0xFF374151), size: 20),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
                           GestureDetector(
                             onTap: () => context.push(RouteNames.notifications),
                             child: Container(
@@ -427,10 +412,6 @@ class _PatientDashboardScreenState extends ConsumerState<PatientDashboardScreen>
                     ),
                     const SizedBox(height: 20),
                   ],
-
-                  // Profiles list (Family Switcher Carousel)
-                  const FamilyMemberList(),
-                  const SizedBox(height: 16),
 
                   // Today's Medications Checklist
                   Row(
@@ -631,21 +612,6 @@ class _PatientDashboardScreenState extends ConsumerState<PatientDashboardScreen>
                   ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Message Circle Button
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: boxBg,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              icon: Icon(Iconsax.message_2, size: 16, color: accentColor),
-              onPressed: () => context.push('/chat-list'),
             ),
           ),
         ],
