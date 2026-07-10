@@ -29,7 +29,7 @@ class RoleSelectionScreen extends StatelessWidget {
               child: Column(
                 children: [
                   Image.asset(
-                    'assets/logo_foreground.png',
+                    'assets/images/app-icon.png',
                     width: 120,
                     height: 120,
                     fit: BoxFit.contain,

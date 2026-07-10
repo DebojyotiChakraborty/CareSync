@@ -64,10 +64,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SizedBox.expand(
+      body: Center(
         child: Image.asset(
-          'assets/Splash_Screen.png',
-          fit: BoxFit.cover,
+          'assets/images/app-icon.png',
+          width: 160,
+          height: 160,
+          fit: BoxFit.contain,
         ),
       ),
     );

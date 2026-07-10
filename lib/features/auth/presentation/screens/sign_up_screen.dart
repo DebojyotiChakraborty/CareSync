@@ -205,7 +205,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   // ── 1. LOGO & BRANDING ──────────────────────────
                   Center(
                     child: Image.asset(
-                      'assets/logo_foreground.png',
+                      'assets/images/app-icon.png',
                       height: 110,
                       width: 110,
                       fit: BoxFit.contain,

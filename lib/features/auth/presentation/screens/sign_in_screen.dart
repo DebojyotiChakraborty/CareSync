@@ -292,7 +292,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 // ── 1. LOGO & BRANDING ──────────────────────────
                 Center(
                   child: Image.asset(
-                    'assets/logo_foreground.png',
+                    'assets/images/app-icon.png',
                     height: 130,
                     width: 130,
                     fit: BoxFit.contain,
