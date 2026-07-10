@@ -79,14 +79,25 @@ dev_dependencies:
   json_serializable: ^6.8.0
   riverpod_generator: ^2.6.2
 
+# App launcher icon generation (run: dart run flutter_launcher_icons)
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/app-icon.png"
+  remove_alpha_ios: true
+  background_color_ios: "#FFFFFF"
+  adaptive_icon_background: "#FFFFFF"
+  # Inset variant: adaptive icons only display the central safe zone, so a
+  # full-bleed foreground gets cropped (launcher icon + Android 12 splash).
+  adaptive_icon_foreground: "assets/images/app-icon-foreground.png"
+  min_sdk_android: 21
+
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
     - assets/icons/
-    - assets/Splash_Screen.png
-    - assets/logo_foreground.png
     - .env
 
   fonts:
