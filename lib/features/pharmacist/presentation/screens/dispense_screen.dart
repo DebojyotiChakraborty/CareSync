@@ -1,14 +1,19 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/design/circular_icon_button.dart';
+import '../../../../core/design/confirm_sheet.dart';
+import '../../../../core/design/cs_buttons.dart';
+import '../../../../core/design/linear_fade_appbar.dart';
+import '../../../../core/design/minimal_sheet_dialog.dart';
+import '../../../../core/design/squircle_card.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/biometric_service.dart';
 import '../../../../services/custom_biometric_service.dart';
@@ -65,6 +70,15 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
     super.dispose();
   }
 
+  void _snack(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? context.tokens.error : context.tokens.accent,
+      ),
+    );
+  }
+
   Future<void> _loadPatientPrescriptions(String qrCodeId) async {
     setState(() {
       _isLoading = true;
@@ -72,7 +86,6 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
     });
 
     try {
-      // Get patient by QR code
       final patient = await SupabaseService.instance.client
           .from('patients')
           .select('id, user_id, profiles!inner(full_name, email)')
@@ -81,18 +94,12 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
 
       if (patient == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Patient not found'),
-              backgroundColor: AppColors.error,
-            ),
-          );
+          _snack('Patient not found', error: true);
           setState(() => _isScanning = true);
         }
         return;
       }
 
-      // Get active prescriptions
       final prescriptions = await SupabaseService.instance.client
           .from('prescriptions')
           .select('''
@@ -123,12 +130,7 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        _snack('Error: $e', error: true);
         setState(() => _isScanning = true);
       }
     } finally {
@@ -149,7 +151,6 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
       final qrCodeId = uri.pathSegments.last;
       _loadPatientPrescriptions(qrCodeId);
     } else {
-      // Fallback: support scanning just the plain QR ID itself
       _loadPatientPrescriptions(value);
     }
   }
@@ -157,57 +158,70 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
   Future<void> _dispensePrescription(Map<String, dynamic> prescription) async {
     final items = prescription['prescription_items'] as List? ?? [];
     final rxItemIdList = items.map((i) => i['id'] as String).toList();
-    
-    // Get checked items for this prescription
-    final selectedItemIds = rxItemIdList.where((id) => _selectedItems[id] == true).toList();
-    
+
+    final selectedItemIds =
+        rxItemIdList.where((id) => _selectedItems[id] == true).toList();
+
     if (selectedItemIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one medication to dispense'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
+      _snack('Please select at least one medication to dispense');
       return;
     }
 
     final notesController = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Confirm Dispensing'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Dispense ${selectedItemIds.length} selected medication(s) for prescription:\n"${prescription['diagnosis'] ?? 'No diagnosis'}"?',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: notesController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Dispense Notes (Optional)',
-                hintText: 'e.g., Generic brand substituted, counseling provided...',
-                border: OutlineInputBorder(),
+    final confirmed = await showAppSheet<bool>(
+      context,
+      builder: (ctx) {
+        final t = ctx.tokens;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Confirm Dispensing',
+                  textAlign: TextAlign.center, style: t.sheetTitle),
+              const SizedBox(height: 12),
+              Text(
+                'Dispense ${selectedItemIds.length} selected medication(s) for prescription:\n"${prescription['diagnosis'] ?? 'No diagnosis'}"?',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: t.textSecondary, height: 1.4),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: notesController,
+                maxLines: 2,
+                cursorColor: t.accent,
+                decoration: InputDecoration(
+                  labelText: 'Dispense Notes (Optional)',
+                  hintText:
+                      'e.g., Generic brand substituted, counseling provided...',
+                  filled: true,
+                  fillColor: t.scaffold,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: t.divider),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: t.divider),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: t.accent, width: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              CSTwoButtonRow(
+                cancelLabel: 'Cancel',
+                confirmLabel: 'Dispense',
+                onCancel: () => Navigator.pop(ctx, false),
+                onConfirm: () => Navigator.pop(ctx, true),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.pharmacist),
-            child: const Text('Dispense'),
-          ),
-        ],
-      ),
+        );
+      },
     );
 
     if (confirmed != true) return;
@@ -223,55 +237,19 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
 
     if (isControlledPrescription) {
       if (!mounted) return;
-      final confirmVerify = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              const Icon(Iconsax.security_safe, color: AppColors.error, size: 28),
-              const SizedBox(width: 8),
-              Text(
-                'Controlled Substance',
-                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: Text(
+      final confirmVerify = await showConfirmSheet(
+        context,
+        icon: Iconsax.security_safe,
+        title: 'Controlled Substance',
+        message:
             'This prescription contains controlled substances (narcotics/stimulants). '
             'By law, biometric facial verification of the patient is required before dispensing.\n\n'
             'Please scan the patient\'s face to proceed.',
-            style: GoogleFonts.plusJakartaSans(height: 1.4),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.plusJakartaSans(color: Colors.grey),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.pop(context, true),
-              icon: const Icon(Iconsax.frame_1),
-              label: Text(
-                'Scan Patient Face',
-                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.pharmacist,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ],
-        ),
+        confirmLabel: 'Scan Patient Face',
       );
 
-      if (confirmVerify != true) return;
+      if (!confirmVerify) return;
 
-      // Initiate camera to scan patient face
       final picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: ImageSource.camera,
@@ -283,12 +261,7 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
 
       if (image == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Facial scan cancelled. Dispensation aborted.'),
-              backgroundColor: AppColors.error,
-            ),
-          );
+          _snack('Facial scan cancelled. Dispensation aborted.', error: true);
         }
         return;
       }
@@ -296,105 +269,60 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
       setState(() => _isLoading = true);
 
       try {
-        final identifyResult = await CustomBiometricService.instance.identifyPatientDetailed(
+        final identifyResult =
+            await CustomBiometricService.instance.identifyPatientDetailed(
           File(image.path),
         );
 
         if (!mounted) return;
         setState(() => _isLoading = false);
 
-        if (identifyResult.status == BiometricResultStatus.success && identifyResult.patientId != null) {
+        if (identifyResult.status == BiometricResultStatus.success &&
+            identifyResult.patientId != null) {
           final expectedUserId = _patient!['user_id'] as String?;
-          final currentPatientName = _patient!['profiles']['full_name'] as String? ?? 'Unknown';
+          final currentPatientName =
+              _patient!['profiles']['full_name'] as String? ?? 'Unknown';
 
           if (identifyResult.patientId == expectedUserId) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Patient Biometric Verified: $currentPatientName (${identifyResult.confidence?.toStringAsFixed(1)}% match)',
-                ),
-                backgroundColor: AppColors.success,
-              ),
+            _snack(
+              'Patient Biometric Verified: $currentPatientName (${identifyResult.confidence?.toStringAsFixed(1)}% match)',
             );
           } else {
             // Patient mismatch!
-            await showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                title: Row(
-                  children: [
-                    const Icon(Iconsax.warning_2, color: AppColors.error, size: 28),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Security Mismatch',
-                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                content: Text(
-                  'Biometric verification failed.\n\n'
+            await showAlertSheet(
+              context,
+              icon: Iconsax.warning_2,
+              title: 'Security Mismatch',
+              message: 'Biometric verification failed.\n\n'
                   'Expected Patient: $currentPatientName\n'
                   'Identified Patient: ${identifyResult.fullName ?? "Unknown"}\n\n'
                   'The dispensing of controlled substances has been blocked for patient safety.',
-                  style: GoogleFonts.plusJakartaSans(height: 1.4),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('Close', style: GoogleFonts.plusJakartaSans()),
-                  ),
-                ],
-              ),
+              buttonLabel: 'Close',
             );
             return;
           }
         } else {
-          // Face did not match database
-          final errMessage = CustomBiometricService.instance.mapStatusToErrorMessage(
+          final errMessage =
+              CustomBiometricService.instance.mapStatusToErrorMessage(
             identifyResult.status,
             identifyResult.errorMessage,
             errorCode: identifyResult.errorCode,
           );
-          await showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: [
-                  const Icon(Iconsax.warning_2, color: AppColors.error, size: 28),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Verification Failed',
-                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              content: Text(
-                'Could not verify patient\'s biometric identity.\n\n'
+          await showAlertSheet(
+            context,
+            icon: Iconsax.warning_2,
+            title: 'Verification Failed',
+            message: 'Could not verify patient\'s biometric identity.\n\n'
                 'Detail: $errMessage\n\n'
                 'Dispensing controlled substances is legally restricted without verified biometric authentication.',
-                style: GoogleFonts.plusJakartaSans(height: 1.4),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Close', style: GoogleFonts.plusJakartaSans()),
-                ),
-              ],
-            ),
+            buttonLabel: 'Close',
           );
           return;
         }
       } catch (e) {
         if (mounted) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Biometric microservice query error: $e'),
-              backgroundColor: AppColors.error,
-            ),
-          );
+          _snack('Biometric microservice query error: $e', error: true);
         }
         return;
       }
@@ -402,57 +330,38 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
 
     // Biometric Verification for Pharmacist
     try {
-      final isBioAvailable = await BiometricService.instance.isBiometricAvailable();
+      final isBioAvailable =
+          await BiometricService.instance.isBiometricAvailable();
       if (isBioAvailable) {
         final authenticated = await BiometricService.instance.authenticate(
-          reason: 'Scan your biometric to authorize this medication dispensation',
-          biometricOnly: false, // fallback to device PIN/passcode
+          reason:
+              'Scan your biometric to authorize this medication dispensation',
+          biometricOnly: false,
         );
         if (!authenticated) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Biometric authentication failed. Dispensation aborted.'),
-                backgroundColor: AppColors.error,
-              ),
-            );
+            _snack('Biometric authentication failed. Dispensation aborted.',
+                error: true);
           }
           return;
         }
       } else {
         if (!mounted) return;
-        // Fallback dialog when biometrics are not configured or available (e.g. emulator)
-        final passcodeConfirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Biometric Offline'),
-            content: const Text(
+        final passcodeConfirmed = await showConfirmSheet(
+          context,
+          icon: Iconsax.finger_scan,
+          title: 'Biometric Offline',
+          message:
               'Biometrics are not set up or supported on this device. '
               'Do you want to authorize this dispensation using your session credentials?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Abort'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.pharmacist),
-                child: const Text('Authorize'),
-              ),
-            ],
-          ),
+          confirmLabel: 'Authorize',
+          cancelLabel: 'Abort',
         );
-        if (passcodeConfirmed != true) return;
+        if (!passcodeConfirmed) return;
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Verification error: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        _snack('Verification error: $e', error: true);
       }
       return;
     }
@@ -460,7 +369,6 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Record dispensing
       await SupabaseService.instance.recordDispensing(
         prescriptionId: prescription['id'] as String,
         patientId: _patient!['id'] as String,
@@ -468,15 +376,12 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
         itemsDispensed: selectedItemIds,
       );
 
-      // Mark prescription items as dispensed
       for (final itemId in selectedItemIds) {
         await SupabaseService.instance.client
             .from('prescription_items')
-            .update({'is_dispensed': true})
-            .eq('id', itemId);
+            .update({'is_dispensed': true}).eq('id', itemId);
       }
 
-      // Check if all items in this prescription are now dispensed
       final allItems = prescription['prescription_items'] as List? ?? [];
       final undispensedItems = allItems.where((item) {
         final itemId = item['id'] as String;
@@ -486,22 +391,14 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
       });
 
       if (undispensedItems.isEmpty) {
-        // Update prescription status to completed
         await SupabaseService.instance.client
             .from('prescriptions')
-            .update({'status': 'completed'})
-            .eq('id', prescription['id']);
+            .update({'status': 'completed'}).eq('id', prescription['id']);
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Medications dispensed successfully'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        _snack('Medications dispensed successfully');
 
-        // Reload prescriptions
         final qrCodeId = await SupabaseService.instance.client
             .from('patients')
             .select('qr_code_id')
@@ -511,12 +408,7 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        _snack('Error: $e', error: true);
       }
     } finally {
       setState(() => _isLoading = false);
@@ -534,27 +426,45 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
+    final topInset = MediaQuery.of(context).padding.top + AppSpacing.appBarHeight;
+
+    final Widget content = _isScanning
+        ? _buildScanner()
+        : _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _buildPrescriptionList();
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dispense Medication'),
-        actions: [
-          if (_patient != null)
-            IconButton(
-              onPressed: _resetScan,
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              tooltip: 'Scan New Patient',
+      backgroundColor: t.scaffold,
+      body: Stack(
+        children: [
+          // Scanner is full-bleed; other states sit below the fade bar.
+          _isScanning
+              ? content
+              : Padding(padding: EdgeInsets.only(top: topInset), child: content),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: LinearFadeAppBar(
+              title: 'Dispense Medication',
+              actions: [
+                if (_patient != null)
+                  CircularIconButton(
+                    icon: Iconsax.scan_barcode,
+                    onTap: _resetScan,
+                  ),
+              ],
             ),
+          ),
         ],
       ),
-      body: _isScanning
-          ? _buildScanner()
-          : _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _buildPrescriptionList(),
     );
   }
 
   Widget _buildScanner() {
+    final t = context.tokens;
     return Stack(
       children: [
         MobileScanner(
@@ -566,10 +476,7 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
             width: 250,
             height: 250,
             decoration: BoxDecoration(
-              border: Border.all(
-                color: AppColors.pharmacist,
-                width: 3,
-              ),
+              border: Border.all(color: t.accent, width: 3),
               borderRadius: BorderRadius.circular(20),
             ),
           ),
@@ -580,20 +487,15 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
           right: 0,
           child: Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
-              ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
                 'Scan patient\'s QR code',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
           ),
@@ -603,6 +505,7 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
   }
 
   Widget _buildPrescriptionList() {
+    final t = context.tokens;
     final dateFormat = DateFormat('MMM d, yyyy');
     final profileData = _patient!['profiles'] as Map<String, dynamic>;
 
@@ -612,56 +515,41 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Patient info
-          Container(
+          SquircleCard(
+            radius: AppSpacing.squircleGrouped,
+            color: t.tint,
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.pharmacist.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
-            ),
             child: Row(
               children: [
                 Container(
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: AppColors.pharmacist.withValues(alpha: 0.2),
+                    color: t.accent.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.person_rounded,
-                    color: AppColors.pharmacist,
-                    size: 28,
-                  ),
+                  child: Icon(Iconsax.user, color: t.accent, size: 28),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Patient',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.pharmacist,
-                        ),
-                      ),
+                      Text('Patient',
+                          style: TextStyle(fontSize: 12, color: t.accent)),
                       Text(
                         profileData['full_name'] as String? ?? 'Unknown',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w700,
+                          color: t.textPrimary,
                         ),
                       ),
                       if (profileData['email'] != null)
                         Text(
                           profileData['email'] as String,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.6),
-                          ),
+                          style:
+                              TextStyle(fontSize: 13, color: t.textSecondary),
                         ),
                     ],
                   ),
@@ -673,46 +561,34 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
           // Prescriptions
           Text(
             'Active Prescriptions (${_prescriptions.length})',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
+              color: t.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
           if (_prescriptions.isEmpty)
-            Container(
+            SquircleCard(
+              radius: AppSpacing.squircleGrouped,
+              borderSide: BorderSide(color: t.divider),
               padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                ),
-              ),
               child: Column(
                 children: [
-                  Icon(
-                    Icons.check_circle_outline_rounded,
-                    size: 48,
-                    color: AppColors.success.withValues(alpha: 0.5),
-                  ),
+                  Icon(Iconsax.tick_circle, size: 48, color: t.accent),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'No active prescriptions',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
+                      color: t.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'All prescriptions have been dispensed',
-                    style: TextStyle(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.6),
-                    ),
+                    style: TextStyle(color: t.textSecondary),
                   ),
                 ],
               ),
@@ -723,180 +599,171 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
               final items = rx['prescription_items'] as List? ?? [];
               final doctor = rx['doctor'] as Map<String, dynamic>?;
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      rx['diagnosis'] as String? ?? 'Unknown',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Dr. ${doctor?['full_name'] ?? 'Unknown'} • ${dateFormat.format(DateTime.parse(rx['created_at'] as String))}',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.6),
-                                      ),
-                                    ),
-                                  ],
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: SquircleCard(
+                  radius: AppSpacing.squircleGrouped,
+                  borderSide: BorderSide(color: t.divider),
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  rx['diagnosis'] as String? ?? 'Unknown',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: t.textPrimary,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          if (items.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            const Divider(height: 1),
-                            const SizedBox(height: 12),
-                            ...items.map((item) {
-                              final itemId = item['id'] as String;
-                              final isDispensed = item['is_dispensed'] as bool? ?? false;
-                              
-                              if (isDispensed) {
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 6),
-                                  child: Row(
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Dr. ${doctor?['full_name'] ?? 'Unknown'} • ${dateFormat.format(DateTime.parse(rx['created_at'] as String))}',
+                                  style: TextStyle(
+                                      fontSize: 13, color: t.textSecondary),
+                                ),
+                              ],
+                            ),
+                            if (items.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Divider(height: 1, color: t.divider),
+                              const SizedBox(height: 12),
+                              ...items.map((item) {
+                                final itemId = item['id'] as String;
+                                final isDispensed =
+                                    item['is_dispensed'] as bool? ?? false;
+
+                                if (isDispensed) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 6),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.check_circle_rounded,
+                                            size: 20, color: t.accent),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            '${item['medicine_name']} - ${item['dosage']}',
+                                            style: TextStyle(
+                                              decoration:
+                                                  TextDecoration.lineThrough,
+                                              color: t.textSecondary,
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          'Dispensed',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: t.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+
+                                final isControlled =
+                                    _controlledSubstances.any((substance) =>
+                                        (item['medicine_name'] as String? ?? '')
+                                            .toLowerCase()
+                                            .contains(substance));
+
+                                return CheckboxListTile(
+                                  value: _selectedItems[itemId] ?? false,
+                                  activeColor: t.accent,
+                                  title: Row(
                                     children: [
-                                      const Icon(
-                                        Icons.check_circle_rounded,
-                                        size: 20,
-                                        color: AppColors.success,
-                                      ),
-                                      const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
                                           '${item['medicine_name']} - ${item['dosage']}',
-                                          style: const TextStyle(
-                                            decoration: TextDecoration.lineThrough,
-                                            color: Colors.grey,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w500,
+                                            color: t.textPrimary,
                                           ),
                                         ),
                                       ),
-                                      Text(
-                                        'Dispensed',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade500,
+                                      if (isControlled)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: t.error
+                                                .withValues(alpha: 0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                            border: Border.all(
+                                                color: t.error
+                                                    .withValues(alpha: 0.2)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Iconsax.security_safe,
+                                                  color: t.error, size: 10),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'CONTROLLED',
+                                                style: t.monoMeta.copyWith(
+                                                  color: t.error,
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
                                     ],
                                   ),
+                                  subtitle: Text(
+                                    '${item['frequency']} for ${item['duration'] ?? "N/A"}',
+                                    style: TextStyle(
+                                        fontSize: 13, color: t.textSecondary),
+                                  ),
+                                  contentPadding: EdgeInsets.zero,
+                                  dense: true,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _selectedItems[itemId] = val ?? false;
+                                    });
+                                  },
                                 );
-                              }
-                              
-                              final isControlled = _controlledSubstances.any(
-                                (substance) => (item['medicine_name'] as String? ?? '').toLowerCase().contains(substance)
-                              );
-
-                              return CheckboxListTile(
-                                value: _selectedItems[itemId] ?? false,
-                                activeColor: AppColors.pharmacist,
-                                title: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        '${item['medicine_name']} - ${item['dosage']}',
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                    if (isControlled)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.error.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              Iconsax.security_safe,
-                                              color: AppColors.error,
-                                              size: 10,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'CONTROLLED',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                color: AppColors.error,
-                                                fontSize: 8,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: 0.5,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                subtitle: Text(
-                                  '${item['frequency']} for ${item['duration'] ?? "N/A"}',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                                contentPadding: EdgeInsets.zero,
-                                dense: true,
-                                onChanged: (val) {
-                                  setState(() {
-                                    _selectedItems[itemId] = val ?? false;
-                                  });
-                                },
-                              );
-                            }),
+                              }),
+                            ],
                           ],
-                        ],
-                      ),
-                    ),
-                    // Dispense button
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.pharmacist.withValues(alpha: 0.1),
-                        borderRadius: const BorderRadius.vertical(
-                          bottom: Radius.circular(16),
                         ),
                       ),
-                      child: ElevatedButton.icon(
-                        onPressed: _isLoading
-                            ? null
-                            : () => _dispensePrescription(rx),
-                        icon: const Icon(Icons.check_rounded),
-                        label: const Text('Dispense Selected'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.pharmacist,
+                      // Dispense button
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: t.tint,
+                          borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(AppSpacing.squircleGrouped),
+                          ),
+                        ),
+                        child: CSPrimaryButton(
+                          label: 'Dispense Selected',
+                          icon: Icons.check_rounded,
+                          onPressed: _isLoading
+                              ? null
+                              : () => _dispensePrescription(rx),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             }),
