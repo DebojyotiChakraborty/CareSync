@@ -87,7 +87,9 @@ flutter_launcher_icons:
   remove_alpha_ios: true
   background_color_ios: "#FFFFFF"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/app-icon.png"
+  # Inset variant: adaptive icons only display the central safe zone, so a
+  # full-bleed foreground gets cropped (launcher icon + Android 12 splash).
+  adaptive_icon_foreground: "assets/images/app-icon-foreground.png"
   min_sdk_android: 21
 
 flutter:
