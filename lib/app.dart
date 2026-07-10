@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
+import 'features/shared/presentation/widgets/splash_reveal_overlay.dart';
 import 'features/shared/providers/theme_provider.dart';
 import 'routing/app_router.dart';
 import 'services/app_lifecycle_service.dart';
@@ -55,21 +56,28 @@ class _CareSyncState extends ConsumerState<CareSync> {
           );
         }
 
-        return MediaQuery(
-          data: mediaQueryData.copyWith(
-            // Prevent text size scaling from breaking standard layouts
-            textScaler: TextScaler.noScaling,
-            // Normalize layout boundaries on wide screens
-            size: isWideScreen
-                ? Size(480, mediaQueryData.size.height)
-                : mediaQueryData.size,
-          ),
-          child: Container(
-            color: isWideScreen
-                ? Theme.of(context).scaffoldBackgroundColor
-                : null,
-            child: appContent,
-          ),
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            MediaQuery(
+              data: mediaQueryData.copyWith(
+                // Prevent text size scaling from breaking standard layouts
+                textScaler: TextScaler.noScaling,
+                // Normalize layout boundaries on wide screens
+                size: isWideScreen
+                    ? Size(480, mediaQueryData.size.height)
+                    : mediaQueryData.size,
+              ),
+              child: Container(
+                color: isWideScreen
+                    ? Theme.of(context).scaffoldBackgroundColor
+                    : null,
+                child: appContent,
+              ),
+            ),
+            // Launch zoom-reveal splash; removes itself after animating.
+            const SplashRevealOverlay(),
+          ],
         );
       },
     );
