@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/design/linear_fade_appbar.dart';
+import '../../../../core/design/squircle_card.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_tokens.dart';
 
-final dispensingHistoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final dispensingHistoryProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final supabase = Supabase.instance.client;
   final userId = supabase.auth.currentUser?.id;
-  
+
   if (userId == null) return [];
-  
+
   final records = await supabase
       .from('dispensing_records')
       .select('''
@@ -26,7 +30,7 @@ final dispensingHistoryProvider = FutureProvider<List<Map<String, dynamic>>>((re
       ''')
       .eq('pharmacist_id', userId)
       .order('dispensed_at', ascending: false);
-  
+
   return List<Map<String, dynamic>>.from(records);
 });
 
@@ -35,30 +39,26 @@ class DispensingHistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.tokens;
     final historyAsync = ref.watch(dispensingHistoryProvider);
     final dateFormat = DateFormat('MMM d, yyyy');
     final timeFormat = DateFormat('h:mm a');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dispensing History'),
-      ),
+    return CSScaffold(
+      title: 'Dispensing History',
       body: historyAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: AppColors.error.withValues(alpha: 0.5),
-              ),
+              Icon(Iconsax.warning_2,
+                  size: 64, color: t.error.withValues(alpha: 0.5)),
               const SizedBox(height: 16),
-              Text('Error: $error'),
+              Text('Error: $error', style: TextStyle(color: t.textPrimary)),
               TextButton(
                 onPressed: () => ref.invalidate(dispensingHistoryProvider),
-                child: const Text('Retry'),
+                child: Text('Retry', style: TextStyle(color: t.accent)),
               ),
             ],
           ),
@@ -95,50 +95,45 @@ class DispensingHistoryScreen extends ConsumerWidget {
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: AppColors.pharmacist.withValues(alpha: 0.1),
+                            color: t.tint,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             date,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.pharmacist,
+                              color: t.accent,
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           '${dayRecords.length} dispensed',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.5),
-                          ),
+                          style: TextStyle(fontSize: 13, color: t.textSecondary),
                         ),
                       ],
                     ),
                   ),
                   // Records for this date
                   ...dayRecords.map((record) {
-                    final prescription = record['prescription'] as Map<String, dynamic>?;
+                    final prescription =
+                        record['prescription'] as Map<String, dynamic>?;
                     final patient = record['patient'] as Map<String, dynamic>?;
-                    final profile = patient?['profiles'] as Map<String, dynamic>?;
-                    final items = prescription?['prescription_items'] as List? ?? [];
-                    final dispensedAt = DateTime.parse(record['dispensed_at'] as String);
+                    final profile =
+                        patient?['profiles'] as Map<String, dynamic>?;
+                    final items =
+                        prescription?['prescription_items'] as List? ?? [];
+                    final dispensedAt =
+                        DateTime.parse(record['dispensed_at'] as String);
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: SquircleCard(
+                        radius: AppSpacing.squircleGrouped,
+                        borderSide: BorderSide(color: t.divider),
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,36 +145,32 @@ class DispensingHistoryScreen extends ConsumerWidget {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: AppColors.patient.withValues(alpha: 0.1),
+                                    color: t.tint,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(
-                                    Icons.person_rounded,
-                                    color: AppColors.patient,
-                                    size: 22,
-                                  ),
+                                  child: Icon(Iconsax.user,
+                                      color: t.accent, size: 22),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        profile?['full_name'] as String? ?? 'Unknown',
-                                        style: const TextStyle(
+                                        profile?['full_name'] as String? ??
+                                            'Unknown',
+                                        style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
+                                          color: t.textPrimary,
                                         ),
                                       ),
                                       Text(
                                         timeFormat.format(dispensedAt),
                                         style: TextStyle(
-                                          fontSize: 12,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withValues(alpha: 0.5),
-                                        ),
+                                            fontSize: 12,
+                                            color: t.textSecondary),
                                       ),
                                     ],
                                   ),
@@ -187,44 +178,30 @@ class DispensingHistoryScreen extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: AppColors.success.withValues(alpha: 0.1),
+                                    color: t.tint,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(
-                                    Icons.check_rounded,
-                                    color: AppColors.success,
-                                    size: 20,
-                                  ),
+                                  child: Icon(Icons.check_rounded,
+                                      color: t.accent, size: 20),
                                 ),
                               ],
                             ),
                             // Diagnosis
                             if (prescription?['diagnosis'] != null) ...[
                               const SizedBox(height: 12),
-                              const Divider(height: 1),
+                              Divider(height: 1, color: t.divider),
                               const SizedBox(height: 12),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(
-                                    Icons.medical_services_outlined,
-                                    size: 18,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.5),
-                                  ),
+                                  Icon(Iconsax.health,
+                                      size: 18, color: t.textSecondary),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       prescription!['diagnosis'] as String,
                                       style: TextStyle(
-                                        fontSize: 13,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.7),
-                                      ),
+                                          fontSize: 13, color: t.textPrimary),
                                     ),
                                   ),
                                 ],
@@ -239,19 +216,17 @@ class DispensingHistoryScreen extends ConsumerWidget {
                                 children: items.map<Widget>((item) {
                                   return Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
+                                        horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: AppColors.pharmacist.withValues(alpha: 0.1),
+                                      color: t.tint,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
                                       '${item['medicine_name']} ${item['dosage']}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500,
-                                        color: AppColors.pharmacist,
+                                        color: t.accent,
                                       ),
                                     ),
                                   );
@@ -267,10 +242,7 @@ class DispensingHistoryScreen extends ConsumerWidget {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontStyle: FontStyle.italic,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface
-                                      .withValues(alpha: 0.5),
+                                  color: t.textSecondary,
                                 ),
                               ),
                             ],
@@ -289,34 +261,28 @@ class DispensingHistoryScreen extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final t = context.tokens;
     return Center(
       child: Padding(
         padding: AppSpacing.screenPadding,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.inventory_2_outlined,
-              size: 80,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
-            ),
+            Icon(Iconsax.box, size: 80, color: t.textSecondary),
             const SizedBox(height: 24),
             Text(
               'No Dispensing History',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: t.textSecondary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Medications you dispense will appear here',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-              ),
+              style: TextStyle(fontSize: 14, color: t.textSecondary),
             ),
           ],
         ),
@@ -324,4 +290,3 @@ class DispensingHistoryScreen extends ConsumerWidget {
     );
   }
 }
-
