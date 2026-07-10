@@ -67,13 +67,6 @@ dependencies:
   image: ^4.5.4
   camera: ^0.12.0+1
 
-  # Wearables Integration
-  health: any
-  workmanager: ^0.9.0+3
-  sqflite: ^2.3.0
-  path: ^1.9.0
-  oauth2: ^2.0.2
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -94,4 +87,13 @@ flutter:
     - assets/icons/
     - assets/Splash_Screen.png
     - assets/logo_foreground.png
-    - .env
+
+  fonts:
+    - family: DM Sans
+      fonts:
+        - asset: assets/fonts/DMSans-Variable.ttf
+    - family: DM Mono
+      fonts:
+        - asset: assets/fonts/DMMono-Regular.ttf
+        - asset: assets/fonts/DMMono-Medium.ttf
+          weight: 500

@@ -121,8 +121,11 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     expected_token = os.getenv("HF_TOKEN")
     if not expected_token:
-        logger.warning("HF_TOKEN is not set in environment variables! Auth is currently bypassed.")
-        return token
+        logger.error("HF_TOKEN is not set in environment variables! API access is disabled.")
+        raise HTTPException(
+            status_code=503,
+            detail="API authorization is not configured. Access is disabled."
+        )
     if token != expected_token:
         raise HTTPException(
             status_code=401,

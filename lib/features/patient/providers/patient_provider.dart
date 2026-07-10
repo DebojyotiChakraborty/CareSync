@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_provider.dart';
-import '../../family/providers/family_provider.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/kyc_service.dart';
 import '../models/patient_data.dart';
@@ -14,10 +13,10 @@ final isKycVerifiedProvider = FutureProvider<bool>((ref) async {
   return kyc?.status == KYCStatus.verified;
 });
 
-/// Provider for current patient data - tied to active profile context
+/// Provider for current patient data - tied to the authenticated user
 final patientDataProvider = FutureProvider<PatientData?>((ref) async {
-  // Watch the active profile (family member or self)
-  final activeId = ref.watch(activeProfileIdProvider);
+  // Watch the currently authenticated user
+  final activeId = ref.watch(authStateProvider).valueOrNull?.id;
   if (activeId == null) return null;
 
   // FIX: This now triggers the updated getPatientData which creates missing records
@@ -161,9 +160,9 @@ class PatientNotifier extends StateNotifier<AsyncValue<PatientData?>> {
   }
 }
 
-// FIX: autoDispose ensures this notifier rebuilds/resets when activeProfileIdProvider changes
+// autoDispose ensures this notifier rebuilds/resets when the authenticated user changes
 final patientNotifierProvider =
 StateNotifierProvider.autoDispose<PatientNotifier, AsyncValue<PatientData?>>((ref) {
-  final activeId = ref.watch(activeProfileIdProvider);
+  final activeId = ref.watch(authStateProvider).valueOrNull?.id;
   return PatientNotifier(activeId);
 });

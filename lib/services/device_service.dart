@@ -1,8 +1,7 @@
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:uuid/uuid.dart';
 import 'dart:developer' as developer;
+import 'secure_storage_service.dart';
 
 /// Service for managing registered devices
 class DeviceService {
@@ -10,10 +9,14 @@ class DeviceService {
   static final DeviceService instance = DeviceService._();
 
   final _supabase = Supabase.instance.client;
-  final _storage = const FlutterSecureStorage();
-  final _uuid = const Uuid();
 
-  static const String _deviceIdKey = 'caresync_device_id';
+  // Device ID is owned by SecureStorageService so that every subsystem
+  // (auth, biometric, device registration) reads and writes the SAME
+  // identifier from the SAME secure backend. Using a second
+  // FlutterSecureStorage instance here diverged on Android
+  // (encryptedSharedPreferences vs default store), which made an already
+  // registered device look brand-new on every relogin and re-triggered 2FA.
+  final _storage = SecureStorageService.instance;
 
   // ─────────────────────────────────────────────────────────────────────────
   // DEVICE IDENTIFICATION
@@ -21,18 +24,12 @@ class DeviceService {
 
   /// Get or create unique device ID
   Future<String> getOrCreateDeviceId() async {
-    String? deviceId = await _storage.read(key: _deviceIdKey);
-    if (deviceId == null) {
-      deviceId = _uuid.v4();
-      await _storage.write(key: _deviceIdKey, value: deviceId);
-      developer.log('[DEVICE] Created new device ID: $deviceId');
-    }
-    return deviceId;
+    return await _storage.getOrCreateDeviceId();
   }
 
   /// Get device ID (returns null if not set)
   Future<String?> getDeviceId() async {
-    return await _storage.read(key: _deviceIdKey);
+    return await _storage.getDeviceId();
   }
 
   /// Get device information (simplified without device_info_plus)
@@ -124,7 +121,7 @@ class DeviceService {
 
       final response = await _supabase
           .from('registered_devices')
-          .upsert(data)
+          .upsert(data, onConflict: 'user_id,device_id')
           .select()
           .single();
 
@@ -407,8 +404,7 @@ class RegisteredDevice {
 
   Future<bool> isCurrentDeviceAsync() async {
     try {
-      final storage = const FlutterSecureStorage();
-      final currentDeviceId = await storage.read(key: 'caresync_device_id');
+      final currentDeviceId = await SecureStorageService.instance.getDeviceId();
       return currentDeviceId == deviceId;
     } catch (e) {
       return false;

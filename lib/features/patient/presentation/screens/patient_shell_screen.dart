@@ -59,7 +59,7 @@ class _PatientShellScreenState extends State<PatientShellScreen> {
     const double navBarExtraBottom = 64.0 + 16.0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           // Inject extra bottom padding so child screens scroll above the nav bar

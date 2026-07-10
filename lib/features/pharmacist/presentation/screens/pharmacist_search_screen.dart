@@ -1,8 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:iconsax/iconsax.dart';
+import '../../../../core/design/cs_buttons.dart';
+import '../../../../core/design/linear_fade_appbar.dart';
+import '../../../../core/design/minimal_sheet_dialog.dart';
+import '../../../../core/design/squircle_card.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../routing/route_names.dart';
 import '../../../../services/supabase_service.dart';
 
@@ -61,34 +66,34 @@ class _PharmacistSearchScreenState extends State<PharmacistSearchScreen> {
 
   Future<void> _selectPatient(Map<String, dynamic> profile) async {
     final phone = profile['phone'] as String? ?? '';
-    final lastFourDigits = phone.length >= 4 ? phone.substring(phone.length - 4) : '1234';
+    final lastFourDigits =
+        phone.length >= 4 ? phone.substring(phone.length - 4) : '1234';
 
-    // Show secure verification dialog (OTP check)
-    final verified = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
+    // Show secure verification sheet (OTP check)
+    final verified = await showAppSheet<bool>(
+      context,
+      builder: (sheetCtx) {
+        final t = sheetCtx.tokens;
         final pinController = TextEditingController();
         bool isPinError = false;
 
         return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: [
-                  Icon(Icons.security_rounded, color: AppColors.pharmacist),
-                  const SizedBox(width: 8),
-                  const Text('Security Verification'),
-                ],
-              ),
-              content: Column(
+          builder: (sheetCtx, setSheetState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
+                  Icon(Iconsax.shield_tick, size: 40, color: t.accent),
+                  const SizedBox(height: 12),
+                  Text('Security Verification',
+                      textAlign: TextAlign.center, style: t.sheetTitle),
+                  const SizedBox(height: 12),
+                  Text(
                     'To access patient prescriptions, please enter the 4-digit code shown on the patient\'s CareSync app.',
-                    style: TextStyle(fontSize: 14),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: t.textSecondary),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -96,41 +101,58 @@ class _PharmacistSearchScreenState extends State<PharmacistSearchScreen> {
                     keyboardType: TextInputType.number,
                     maxLength: 4,
                     obscureText: true,
-                    style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
+                    cursorColor: t.accent,
+                    style: TextStyle(
+                        fontSize: 24,
+                        letterSpacing: 8,
+                        fontWeight: FontWeight.w700,
+                        color: t.textPrimary),
                     textAlign: TextAlign.center,
                     decoration: InputDecoration(
                       hintText: '••••',
                       counterText: '',
-                      errorText: isPinError ? 'Invalid verification code' : null,
-                      border: const OutlineInputBorder(),
+                      errorText:
+                          isPinError ? 'Invalid verification code' : null,
+                      filled: true,
+                      fillColor: t.scaffold,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: t.divider),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: t.divider),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: t.accent, width: 1.5),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Text(
                     'Hint: Patient\'s phone last 4 digits ($lastFourDigits)',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: t.textSecondary,
+                        fontStyle: FontStyle.italic),
+                  ),
+                  const SizedBox(height: 20),
+                  CSTwoButtonRow(
+                    cancelLabel: 'Cancel',
+                    confirmLabel: 'Verify',
+                    onCancel: () => Navigator.pop(sheetCtx, false),
+                    onConfirm: () {
+                      if (pinController.text.trim() == lastFourDigits) {
+                        Navigator.pop(sheetCtx, true);
+                      } else {
+                        setSheetState(() => isPinError = true);
+                      }
+                    },
                   ),
                 ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (pinController.text.trim() == lastFourDigits) {
-                      Navigator.pop(context, true);
-                    } else {
-                      setDialogState(() {
-                        isPinError = true;
-                      });
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.pharmacist),
-                  child: const Text('Verify'),
-                ),
-              ],
             );
           },
         );
@@ -151,9 +173,9 @@ class _PharmacistSearchScreenState extends State<PharmacistSearchScreen> {
 
       if (patientRecord == null || patientRecord['qr_code_id'] == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Patient record has no registered QR code ID'),
-            backgroundColor: AppColors.error,
+          SnackBar(
+            content: const Text('Patient record has no registered QR code ID'),
+            backgroundColor: context.tokens.error,
           ),
         );
         return;
@@ -166,7 +188,9 @@ class _PharmacistSearchScreenState extends State<PharmacistSearchScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Database error: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+              content: Text('Database error: $e'),
+              backgroundColor: context.tokens.error),
         );
       }
     }
@@ -174,49 +198,64 @@ class _PharmacistSearchScreenState extends State<PharmacistSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Patient Prescription Search'),
-      ),
+    final t = context.tokens;
+    return CSScaffold(
+      title: 'Patient Search',
       body: Padding(
         padding: AppSpacing.screenPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Search Patients',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: t.textPrimary),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Enter patient name, email, or phone number to load prescription list.',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 14, color: t.textSecondary),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _searchController,
               onChanged: _onSearchChanged,
+              cursorColor: t.accent,
               decoration: InputDecoration(
                 hintText: 'Search by name, email, or phone...',
-                prefixIcon: const Icon(Icons.search_rounded),
+                prefixIcon: Icon(Iconsax.search_normal_1, color: t.textSecondary),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear_rounded),
+                        icon: const Icon(Iconsax.close_circle),
+                        color: t.textSecondary,
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchResults = []);
                         },
                       )
                     : null,
+                filled: true,
+                fillColor: t.card,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: t.divider),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: t.divider),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: t.accent, width: 1.5),
                 ),
               ),
             ),
             const SizedBox(height: 24),
             Expanded(
               child: _isSearching
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(child: CircularProgressIndicator(color: t.accent))
                   : _searchResults.isEmpty
                       ? _buildEmptyState()
                       : _buildSearchResults(),
@@ -228,21 +267,18 @@ class _PharmacistSearchScreenState extends State<PharmacistSearchScreen> {
   }
 
   Widget _buildEmptyState() {
+    final t = context.tokens;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.people_outline_rounded,
-            size: 64,
-            color: Colors.grey.shade400,
-          ),
+          Icon(Iconsax.people, size: 64, color: t.textSecondary),
           const SizedBox(height: 16),
           Text(
             _searchController.text.length < 2
                 ? 'Type at least 2 characters to search'
                 : 'No patients found',
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+            style: TextStyle(color: t.textSecondary, fontSize: 16),
           ),
         ],
       ),
@@ -250,30 +286,36 @@ class _PharmacistSearchScreenState extends State<PharmacistSearchScreen> {
   }
 
   Widget _buildSearchResults() {
-    return ListView.builder(
+    final t = context.tokens;
+    return ListView.separated(
       itemCount: _searchResults.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final profile = _searchResults[index];
         final email = profile['email'] as String? ?? 'No email';
         final phone = profile['phone'] as String? ?? 'No phone';
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        return SquircleCard(
+          radius: AppSpacing.squircleGrouped,
+          borderSide: BorderSide(color: t.divider),
+          padding: EdgeInsets.zero,
+          onTap: () => _selectPatient(profile),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             leading: CircleAvatar(
-              backgroundColor: AppColors.pharmacist.withValues(alpha: 0.1),
-              child: const Icon(Icons.person_rounded, color: AppColors.pharmacist),
+              backgroundColor: t.tint,
+              child: Icon(Iconsax.user, color: t.accent),
             ),
             title: Text(
               profile['full_name'] as String? ?? 'Unknown Patient',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  fontWeight: FontWeight.w700, color: t.textPrimary),
             ),
-            subtitle: Text('$email\n$phone', style: const TextStyle(fontSize: 12)),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            subtitle: Text('$email\n$phone',
+                style: TextStyle(fontSize: 12, color: t.textSecondary)),
+            trailing: Icon(Iconsax.arrow_right_3, color: t.textSecondary),
             isThreeLine: true,
-            onTap: () => _selectPatient(profile),
           ),
         );
       },
