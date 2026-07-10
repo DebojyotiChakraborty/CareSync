@@ -245,7 +245,15 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
 
   Future<void> signOut() async {
     await _supabase.signOut();
-    await _storage.clearSession();
+    // Full teardown (not just clearSession): also drop the biometric-enabled
+    // flag and stored tokens so a different user on a shared device cannot
+    // inherit the previous account's biometric unlock or session.
+    await _storage.clearAll();
+    // Invalidate cached role / biometric / KYC state so nothing leaks across
+    // account switches within the same app process.
+    ref.invalidate(currentProfileProvider);
+    ref.invalidate(biometricEnabledProvider);
+    ref.invalidate(kycStatusProvider);
     state = const AsyncValue.data(null);
   }
 

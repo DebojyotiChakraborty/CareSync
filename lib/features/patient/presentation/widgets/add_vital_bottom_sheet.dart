@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:iconsax/iconsax.dart';
+import '../../../../core/design/cs_buttons.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../models/vital.dart';
 import '../../providers/vitals_provider.dart';
+import 'package:caresync/core/design/squircle_input_border.dart';
 
 class AddVitalBottomSheet extends ConsumerStatefulWidget {
   const AddVitalBottomSheet({super.key});
 
   @override
-  ConsumerState<AddVitalBottomSheet> createState() => _AddVitalBottomSheetState();
+  ConsumerState<AddVitalBottomSheet> createState() =>
+      _AddVitalBottomSheetState();
 }
 
 class _AddVitalBottomSheetState extends ConsumerState<AddVitalBottomSheet> {
@@ -27,10 +31,10 @@ class _AddVitalBottomSheetState extends ConsumerState<AddVitalBottomSheet> {
 
     try {
       await ref.read(patientVitalsProvider.notifier).addVital(
-        type: _selectedType,
-        value: _valueController.text,
-        unit: _selectedType.unit,
-      );
+            type: _selectedType,
+            value: _valueController.text,
+            unit: _selectedType.unit,
+          );
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
@@ -43,16 +47,13 @@ class _AddVitalBottomSheetState extends ConsumerState<AddVitalBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final t = context.tokens;
+    return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        top: 24,
+        top: 8,
         left: 24,
         right: 24,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: Form(
         key: _formKey,
@@ -63,33 +64,24 @@ class _AddVitalBottomSheetState extends ConsumerState<AddVitalBottomSheet> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Log Health Vital',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textMain,
-                  ),
-                ),
+                Text('Log Health Vital', style: t.sheetTitle),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded),
+                  icon: const Icon(Iconsax.close_circle),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             // Type Selection
             DropdownButtonFormField<VitalType>(
-              value: _selectedType,
+              initialValue: _selectedType,
               decoration: InputDecoration(
                 labelText: 'Vital Type',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                border:
+                    SquircleInputBorder(),
               ),
               items: VitalType.values.map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(type.name),
-                );
+                return DropdownMenuItem(value: type, child: Text(type.name));
               }).toList(),
               onChanged: (val) {
                 if (val != null) setState(() => _selectedType = val);
@@ -100,25 +92,23 @@ class _AddVitalBottomSheetState extends ConsumerState<AddVitalBottomSheet> {
             TextFormField(
               controller: _valueController,
               keyboardType: TextInputType.text,
+              cursorColor: t.accent,
               decoration: InputDecoration(
                 labelText: 'Value',
-                hintText: _selectedType == VitalType.bloodPressure ? '120/80' : '75.5',
+                hintText: _selectedType == VitalType.bloodPressure
+                    ? '120/80'
+                    : '75.5',
                 suffixText: _selectedType.unit,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                border:
+                    SquircleInputBorder(),
               ),
-              validator: (val) => (val == null || val.isEmpty) ? 'Please enter a value' : null,
+              validator: (val) =>
+                  (val == null || val.isEmpty) ? 'Please enter a value' : null,
             ),
-            const SizedBox(height: 32),
-            ElevatedButton(
+            const SizedBox(height: 28),
+            CSPrimaryButton(
+              label: 'Save Record',
               onPressed: _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.softPrimary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 0,
-              ),
-              child: const Text('Save Record', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),

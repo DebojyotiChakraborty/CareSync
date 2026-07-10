@@ -8,13 +8,20 @@ This document describes how to deploy the CareSync ecosystem, including Supabase
 
 You must configure the `.env` file before executing builds.
 
-| Key | Example / Default | Target Subsystem | Description |
+> [!WARNING]
+> **Security Isolation**: The Flutter app must *never* contain the `SUPABASE_SERVICE_ROLE_KEY`. To prevent environment leakage, the `.env` file is NOT bundled into the mobile assets. Instead, the Flutter app loads its configuration at compile-time via `--dart-define-from-file=.env`.
+> 
+> The Python Biometric API (FastAPI) requires the `SUPABASE_SERVICE_ROLE_KEY` (and `HF_TOKEN`) which should be configured directly in your Hugging Face Space secrets or locally in a private `/biometric_api/.env` file.
+
+### Environment Schema
+
+| Key | Example / Default | Target Subsystem | Description / Security Scope |
 | :--- | :--- | :--- | :--- |
-| `SUPABASE_URL` | `https://xxxx.supabase.co` | Flutter & FastAPI | Project database API endpoint |
-| `SUPABASE_ANON_KEY` | `eyJhbGciOi...` | Flutter & FastAPI | Anonymous client API access key |
-| `SUPABASE_SERVICE_ROLE_KEY`| `eyJhbGciOi...` | FastAPI API | Database bypass key for backend lookup |
-| `BIOMETRIC_API_URL` | `http://localhost:8000` | Flutter client | Target endpoint of Python server |
-| `HF_TOKEN` | `hf_abcdefg12345` | FastAPI API | Bearer token verifying client requests |
+| `SUPABASE_URL` | `https://xxxx.supabase.co` | Flutter & FastAPI | Project database API endpoint (safe for client) |
+| `SUPABASE_ANON_KEY` | `eyJhbGciOi...` | Flutter & FastAPI | Anonymous client API access key (safe for client) |
+| `SUPABASE_SERVICE_ROLE_KEY`| `eyJhbGciOi...` | FastAPI API (HF Only) | Database bypass key for backend lookup (**SECRET - NEVER PUT IN CLIENT .env**) |
+| `BIOMETRIC_API_URL` | `http://localhost:8000` | Flutter client | Target endpoint of Python server (safe for client) |
+| `HF_TOKEN` | `hf_abcdefg12345` | FastAPI & Flutter | Bearer token verifying client requests (shared client-server secret) |
 
 ---
 
@@ -107,3 +114,17 @@ git remote add hf https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME
 git push hf main
 ```
 The Space will automatically rebuild and start running.
+
+---
+
+## 5. Security & Key Rotation Procedures
+
+### Rotating the `SUPABASE_SERVICE_ROLE_KEY`
+If the service role key is compromised or needs rotation:
+1. Go to the **Supabase Dashboard** → **Project Settings** → **API**.
+2. Scroll to the **JWT Settings** section.
+3. Locate the `service_role` key row and click **Roll Key**.
+4. Review the warning and confirm the rotation. Copy the new key.
+5. Immediately update the `SUPABASE_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) secret in your Hugging Face Space settings.
+6. Verify the Biometrics Space rebuilds/restarts successfully and connects with the new key.
+7. *Note*: Supabase Deno Edge Functions (such as `emergency`) automatically receive the updated key at runtime; no redeployment is needed.

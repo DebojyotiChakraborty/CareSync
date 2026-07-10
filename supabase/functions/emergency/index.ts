@@ -54,13 +54,35 @@ serve(async (req) => {
       );
     }
 
-    // Log access
-    await supabase.from("emergency_access_logs").insert({
-      patient_id: data.patient_id,
-      access_type: "web",
-      ip_address: req.headers.get("x-forwarded-for") || "unknown",
-      user_agent: req.headers.get("user-agent") || "unknown",
-    });
+    // Log access (append-only audit trail). The insert must satisfy the NOT-NULL / CHECK
+    // constraints on emergency_access_logs; the previous payload used non-existent columns
+    // (access_type/user_agent) and an undefined patient_id, so every web access went
+    // UNLOGGED. get_emergency_data now returns patient_id for this row.
+    const { error: logError } = await supabase
+      .from("emergency_access_logs")
+      .insert({
+        patient_id: data.patient_id ?? null,
+        accessed_by_name: "Anonymous (QR Web)",
+        accessed_by_role: "first_responder",
+        authentication_method: "QR Code",
+        access_status: "Success",
+        view_scope: "Emergency Summary",
+        ip_address: req.headers.get("x-forwarded-for") || "unknown",
+        device_platform: (req.headers.get("user-agent") || "unknown").slice(0, 500),
+      });
+
+    if (logError) {
+      // Fail closed: emergency/biometric access MUST be audit-logged. If we cannot record
+      // the access, do not disclose the medical record.
+      console.error("emergency_access_logs insert failed:", logError.message);
+      return new Response(
+        generateHTML({
+          error: true,
+          message: "Unable to record access audit. Please try again.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "text/html" } }
+      );
+    }
 
     return new Response(generateHTML(data), {
       headers: { ...corsHeaders, "Content-Type": "text/html" },
@@ -78,6 +100,20 @@ serve(async (req) => {
   }
 });
 
+// SECURITY: HTML-escape every patient-controlled value before interpolating it into markup.
+// Patient names, condition descriptions, medications and emergency-contact fields are
+// user-supplied and were previously concatenated raw, allowing stored XSS in the emergency
+// page that any first responder would execute when scanning the QR code.
+function esc(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function generateHTML(data: any): string {
   if (data.error) {
     return `
@@ -93,7 +129,7 @@ function generateHTML(data: any): string {
   <div class="container error-container">
     <div class="error-icon">⚠️</div>
     <h1>Error</h1>
-    <p>${data.message}</p>
+    <p>${esc(data.message)}</p>
     <a href="/" class="button">Go Home</a>
   </div>
 </body>
@@ -108,10 +144,10 @@ function generateHTML(data: any): string {
     ? conditions
         .map(
           (c: any) => `
-        <div class="condition-card ${c.type}">
-          <span class="condition-type">${c.type?.toUpperCase() || "OTHER"}</span>
-          ${c.severity ? `<span class="severity ${c.severity}">${c.severity}</span>` : ""}
-          <p class="condition-desc">${c.description}</p>
+        <div class="condition-card ${esc(c.type)}">
+          <span class="condition-type">${esc(c.type?.toUpperCase() || "OTHER")}</span>
+          ${c.severity ? `<span class="severity ${esc(c.severity)}">${esc(c.severity)}</span>` : ""}
+          <p class="condition-desc">${esc(c.description)}</p>
         </div>
       `
         )
@@ -123,8 +159,8 @@ function generateHTML(data: any): string {
         .map(
           (m: any) => `
         <div class="medication-card">
-          <div class="med-name">${m.medicine}</div>
-          <div class="med-details">${m.dosage} • ${m.frequency}</div>
+          <div class="med-name">${esc(m.medicine)}</div>
+          <div class="med-details">${esc(m.dosage)} • ${esc(m.frequency)}</div>
         </div>
       `
         )
@@ -152,7 +188,7 @@ function generateHTML(data: any): string {
       <div class="patient-icon">👤</div>
       <div class="patient-info">
         <span class="label">PATIENT</span>
-        <h1 class="patient-name">${patient.full_name || "Unknown"}</h1>
+        <h1 class="patient-name">${esc(patient.full_name || "Unknown")}</h1>
       </div>
       ${
         patient.blood_type
@@ -160,7 +196,7 @@ function generateHTML(data: any): string {
         <div class="blood-type">
           <span class="blood-icon">🩸</span>
           <span class="blood-label">BLOOD TYPE</span>
-          <span class="blood-value">${patient.blood_type}</span>
+          <span class="blood-value">${esc(patient.blood_type)}</span>
         </div>
       `
           : ""
@@ -187,10 +223,10 @@ function generateHTML(data: any): string {
       <section class="section">
         <h2>📞 Emergency Contact</h2>
         <div class="contact-card">
-          <div class="contact-name">${patient.emergency_contact.name}</div>
-          ${patient.emergency_contact.relationship ? `<div class="contact-relation">${patient.emergency_contact.relationship}</div>` : ""}
-          <a href="tel:${patient.emergency_contact.phone}" class="call-button">
-            📱 Call ${patient.emergency_contact.phone}
+          <div class="contact-name">${esc(patient.emergency_contact.name)}</div>
+          ${patient.emergency_contact.relationship ? `<div class="contact-relation">${esc(patient.emergency_contact.relationship)}</div>` : ""}
+          <a href="tel:${encodeURIComponent(patient.emergency_contact.phone ?? "")}" class="call-button">
+            📱 Call ${esc(patient.emergency_contact.phone)}
           </a>
         </div>
       </section>

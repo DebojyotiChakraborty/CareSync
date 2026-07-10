@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
 import 'dart:math';
+import '../../../../core/design/linear_fade_appbar.dart';
+import '../../../../core/design/squircle_card.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../routing/route_names.dart';
 import '../../../../services/encryption_service.dart';
 import '../../../patient/models/patient_data.dart';
@@ -40,61 +43,45 @@ class PatientRecordScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.tokens;
     final patientData = ref.watch(doctorPatientDataProvider(patientId));
     final vitals = ref.watch(doctorPatientVitalsProvider(patientId));
     final conditions = ref.watch(doctorPatientConditionsProvider(patientId));
-    final prescriptions = ref.watch(doctorPatientPrescriptionsProvider(patientId));
+    final prescriptions =
+        ref.watch(doctorPatientPrescriptionsProvider(patientId));
 
-    // Color tokens
-    const Color kBgColor = Color(0xFFF7F8FA);
-    const Color kSurfaceColor = Color(0xFFFFFFFF);
-    const Color kPrimaryColor = Color(0xFF6366F1);
-    const Color kWarningColor = Color(0xFFF59E0B);
-    const Color kTextPrimary = Color(0xFF111827);
-    const Color kTextSecondary = Color(0xFF6B7280);
-    const Color kBorderColor = Color(0xFFE2E8F0);
-
-    return Scaffold(
-      backgroundColor: kBgColor,
-      appBar: AppBar(
-        backgroundColor: kSurfaceColor,
+    return CSScaffold(
+      title: patientName,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          context.push(RouteNames.doctorNewPrescription, extra: {
+            'patientId': patientId,
+            'patientName': patientName,
+          });
+        },
+        backgroundColor: t.accent,
+        foregroundColor: t.accentOn,
         elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: kTextPrimary, size: 18),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          patientName,
-          style: GoogleFonts.manrope(
-            color: kTextPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+        icon: const Icon(Iconsax.add, size: 18),
+        label: const Text(
+          'Issue Prescription',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            letterSpacing: -0.2,
           ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Iconsax.message_2, color: kTextPrimary, size: 20),
-            onPressed: () {
-              // Navigate to chat with patient
-              context.push('/chat-list');
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-        shape: const Border(
-          bottom: BorderSide(color: kBorderColor, width: 1),
         ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // ── 1. PATIENT HEADER DETAIL ─────────────────────────────────────
+            // ── 1. PATIENT HEADER DETAIL ─────────────────────────────────
             patientData.when(
-              data: (data) => _buildHeaderCard(data, kSurfaceColor, kBorderColor, kTextPrimary, kTextSecondary, kPrimaryColor),
-              loading: () => const LinearProgressIndicator(color: kPrimaryColor, minHeight: 2),
+              data: (data) => _buildHeaderCard(context, data),
+              loading: () =>
+                  LinearProgressIndicator(color: t.accent, minHeight: 2),
               error: (_, __) => const SizedBox.shrink(),
             ),
 
@@ -103,66 +90,73 @@ class PatientRecordScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── 2. RECENT VITALS ───────────────────────────────────────
-                  _buildSectionLabel('Recent Vitals'),
+                  // ── 2. RECENT VITALS ───────────────────────────────────
+                  _buildSectionLabel(context, 'Recent Vitals'),
                   const SizedBox(height: 12),
                   vitals.when(
                     data: (v) => FutureBuilder<List<Vital>>(
                       future: _decryptVitals(v),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(
                             child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryColor),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 16),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: t.accent),
                             ),
                           );
                         }
                         if (snapshot.hasError) {
-                          return Center(child: Text('Error decrypting vitals: ${snapshot.error}'));
+                          return Center(
+                              child: Text(
+                                  'Error decrypting vitals: ${snapshot.error}'));
                         }
                         final decryptedVitals = snapshot.data ?? [];
-                        return _buildVitalsChartOrGrid(decryptedVitals, kSurfaceColor, kBorderColor, kTextPrimary, kTextSecondary);
+                        return _buildVitalsChartOrGrid(context, decryptedVitals);
                       },
                     ),
-                    loading: () => const Center(
+                    loading: () => Center(
                       child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryColor),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: t.accent),
                       ),
                     ),
-                    error: (e, __) => Center(child: Text('Error loading vitals: $e')),
+                    error: (e, __) =>
+                        Center(child: Text('Error loading vitals: $e')),
                   ),
 
                   const SizedBox(height: 28),
 
-                  // ── 3. MEDICAL CONDITIONS ──────────────────────────────────
-                  _buildSectionLabel('Medical Conditions'),
+                  // ── 3. MEDICAL CONDITIONS ──────────────────────────────
+                  _buildSectionLabel(context, 'Medical Conditions'),
                   const SizedBox(height: 12),
                   conditions.when(
-                    data: (c) => _buildConditionsList(c, kSurfaceColor, kBorderColor, kTextPrimary, kTextSecondary, kWarningColor),
+                    data: (c) => _buildConditionsList(context, c),
                     loading: () => const SizedBox.shrink(),
-                    error: (e, __) => Center(child: Text('Error loading conditions: $e')),
+                    error: (e, __) =>
+                        Center(child: Text('Error loading conditions: $e')),
                   ),
 
                   const SizedBox(height: 28),
 
-                  // ── 4. PRESCRIPTION HISTORY ────────────────────────────────
+                  // ── 4. PRESCRIPTION HISTORY ────────────────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildSectionLabel('Prescription History'),
+                      _buildSectionLabel(context, 'Prescription History'),
                       GestureDetector(
                         onTap: () {
-                          // Route to doctor history screen
                           context.push(RouteNames.doctorHistory);
                         },
                         child: Text(
                           'View All',
-                          style: GoogleFonts.manrope(
+                          style: TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: kPrimaryColor,
+                            fontWeight: FontWeight.w700,
+                            color: t.accent,
                           ),
                         ),
                       ),
@@ -170,14 +164,16 @@ class PatientRecordScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   prescriptions.when(
-                    data: (p) => _buildPrescriptionList(p, kSurfaceColor, kBorderColor, kTextPrimary, kTextSecondary),
-                    loading: () => const Center(
+                    data: (p) => _buildPrescriptionList(context, p),
+                    loading: () => Center(
                       child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryColor),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: t.accent),
                       ),
                     ),
-                    error: (e, __) => Center(child: Text('Error loading prescriptions: $e')),
+                    error: (e, __) =>
+                        Center(child: Text('Error loading prescriptions: $e')),
                   ),
                   const SizedBox(height: 120), // Padding to clear FAB
                 ],
@@ -186,76 +182,52 @@ class PatientRecordScreen extends ConsumerWidget {
           ],
         ),
       ),
-      // ── 5. PREMIUM BOTTOM ACTIONS ──────────────────────────────────────────
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          context.push(RouteNames.doctorNewPrescription, extra: {
-            'patientId': patientId,
-            'patientName': patientName,
-          });
-        },
-        backgroundColor: const Color(0xFF0D0D0D),
-        elevation: 2,
-        highlightElevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        icon: const Icon(Iconsax.add, color: Colors.white, size: 18),
-        label: Text(
-          'Issue Prescription',
-          style: GoogleFonts.manrope(
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-            color: Colors.white,
-            letterSpacing: -0.2,
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
-  Widget _buildHeaderCard(
-    PatientData? patient,
-    Color surface,
-    Color border,
-    Color textP,
-    Color textS,
-    Color primary,
-  ) {
+  Widget _buildHeaderCard(BuildContext context, PatientData? patient) {
+    final t = context.tokens;
     if (patient == null) return const SizedBox.shrink();
 
     final name = patient.fullName ?? patientName;
-    final patientInitials = name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').join().toUpperCase();
+    final patientInitials = name
+        .split(' ')
+        .map((e) => e.isNotEmpty ? e[0] : '')
+        .join()
+        .toUpperCase();
     final ageStr = _calculateAge(patient.dateOfBirth);
-    final genderStr = patient.gender != null 
-        ? (patient.gender!.substring(0, 1).toUpperCase() + patient.gender!.substring(1).toLowerCase())
+    final genderStr = patient.gender != null
+        ? (patient.gender!.substring(0, 1).toUpperCase() +
+            patient.gender!.substring(1).toLowerCase())
         : 'N/A';
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: surface,
-        border: Border(bottom: BorderSide(color: border, width: 1)),
+        color: t.card,
+        border: Border(bottom: BorderSide(color: t.divider, width: 1)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Patient Info Top Bar ───────────────────────────────────────────
+          // ── Patient Info Top Bar ───────────────────────────────────────
           Row(
             children: [
               Container(
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.08),
+                  color: t.tint,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  patientInitials.substring(0, min(2, patientInitials.length)),
-                  style: GoogleFonts.manrope(
-                    color: primary,
-                    fontWeight: FontWeight.bold,
+                  patientInitials.substring(
+                      0, min(2, patientInitials.length)),
+                  style: TextStyle(
+                    color: t.accent,
+                    fontWeight: FontWeight.w700,
                     fontSize: 20,
                   ),
                 ),
@@ -267,9 +239,9 @@ class PatientRecordScreen extends ConsumerWidget {
                   children: [
                     Text(
                       name,
-                      style: GoogleFonts.manrope(
-                        color: textP,
-                        fontWeight: FontWeight.w800,
+                      style: TextStyle(
+                        color: t.textPrimary,
+                        fontWeight: FontWeight.w900,
                         fontSize: 18,
                         letterSpacing: -0.4,
                       ),
@@ -277,8 +249,8 @@ class PatientRecordScreen extends ConsumerWidget {
                     const SizedBox(height: 4),
                     Text(
                       'Record ID: ${patient.id.substring(0, 8).toUpperCase()}',
-                      style: GoogleFonts.manrope(
-                        color: textS,
+                      style: t.monoMeta.copyWith(
+                        color: t.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -290,13 +262,13 @@ class PatientRecordScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // ── Demographics Grid ──────────────────────────────────────────────
+          // ── Demographics Grid ──────────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC), // Slate 50
+              color: t.scaffold,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: border),
+              border: Border.all(color: t.divider),
             ),
             child: GridView.count(
               crossAxisCount: 2,
@@ -306,29 +278,45 @@ class PatientRecordScreen extends ConsumerWidget {
               crossAxisSpacing: 16,
               mainAxisSpacing: 12,
               children: [
-                _buildInfoGridItem('Age', ageStr),
-                _buildInfoGridItem('Gender', genderStr),
-                _buildInfoGridItem('Blood Type', patient.bloodType ?? 'N/A'),
-                _buildInfoGridItem('Weight', patient.weight != null ? "${patient.weight!.toStringAsFixed(0)} kg" : 'N/A'),
-                _buildInfoGridItem('Height', patient.height != null ? "${patient.height!.toStringAsFixed(0)} cm" : 'N/A'),
-                _buildInfoGridItem('DOB', patient.dateOfBirth != null ? DateFormat('dd MMM yyyy').format(patient.dateOfBirth!) : 'N/A'),
+                _buildInfoGridItem(context, 'Age', ageStr),
+                _buildInfoGridItem(context, 'Gender', genderStr),
+                _buildInfoGridItem(
+                    context, 'Blood Type', patient.bloodType ?? 'N/A'),
+                _buildInfoGridItem(
+                    context,
+                    'Weight',
+                    patient.weight != null
+                        ? "${patient.weight!.toStringAsFixed(0)} kg"
+                        : 'N/A'),
+                _buildInfoGridItem(
+                    context,
+                    'Height',
+                    patient.height != null
+                        ? "${patient.height!.toStringAsFixed(0)} cm"
+                        : 'N/A'),
+                _buildInfoGridItem(
+                    context,
+                    'DOB',
+                    patient.dateOfBirth != null
+                        ? DateFormat('dd MMM yyyy').format(patient.dateOfBirth!)
+                        : 'N/A'),
               ],
             ),
           ),
-          
-          // ── Emergency Contact ──────────────────────────────────────────────
+
+          // ── Emergency Contact ──────────────────────────────────────────
           if (patient.emergencyContact != null) ...[
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F2), // Rose 50 for alert safety feel
+                color: t.error.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFFECDD3)), // Rose 200
+                border: Border.all(color: t.error.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.emergency_rounded, color: const Color(0xFFE11D48), size: 20),
+                  Icon(Iconsax.warning_2, color: t.error, size: 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -336,29 +324,29 @@ class PatientRecordScreen extends ConsumerWidget {
                       children: [
                         Text(
                           'Emergency Contact',
-                          style: GoogleFonts.manrope(
+                          style: t.monoMeta.copyWith(
                             fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF9F1239), // Rose 800
+                            fontWeight: FontWeight.w700,
+                            color: t.error,
                             letterSpacing: 0.5,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '${patient.emergencyContact!.name} (${patient.emergencyContact!.relationship ?? "Contact"})',
-                          style: GoogleFonts.manrope(
+                          style: TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF0F172A),
+                            fontWeight: FontWeight.w700,
+                            color: t.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           patient.emergencyContact!.phone,
-                          style: GoogleFonts.manrope(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: const Color(0xFF475569),
+                            color: t.textSecondary,
                           ),
                         ),
                       ],
@@ -373,35 +361,37 @@ class PatientRecordScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoGridItem(String label, String value) {
+  Widget _buildInfoGridItem(BuildContext context, String label, String value) {
+    final t = context.tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
           label.toUpperCase(),
-          style: GoogleFonts.manrope(
+          style: t.monoMeta.copyWith(
             fontSize: 9,
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF64748B),
+            fontWeight: FontWeight.w700,
+            color: t.textSecondary,
             letterSpacing: 0.5,
           ),
         ),
         const SizedBox(height: 2),
         Text(
           value,
-          style: GoogleFonts.manrope(
+          style: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF1E293B),
+            fontWeight: FontWeight.w700,
+            color: t.textPrimary,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildVitalsChartOrGrid(List<Vital> vitals, Color surface, Color border, Color textP, Color textS) {
-    if (vitals.isEmpty) return _buildEmptyCard('No vitals recorded', surface, border, textP, textS);
+  Widget _buildVitalsChartOrGrid(BuildContext context, List<Vital> vitals) {
+    final t = context.tokens;
+    if (vitals.isEmpty) return _buildEmptyCard(context, 'No vitals recorded');
 
     // Group vitals by type
     final grouped = <String, List<Vital>>{};
@@ -412,18 +402,19 @@ class PatientRecordScreen extends ConsumerWidget {
     return Column(
       children: grouped.entries.map((entry) {
         final type = entry.key;
-        final list = entry.value.reversed.toList(); // Chronological order (left to right)
-        final latest = entry.value.first; // Latest is first in raw list
+        final list = entry.value.reversed.toList();
+        final latest = entry.value.first;
 
         // Parse values
         final values = <double>[];
         final secondaryValues = <double>[];
-        
+
         for (var v in list) {
           if (type == 'blood_pressure') {
             final parts = v.value.split('/');
             final sys = double.tryParse(parts[0]) ?? 120.0;
-            final dia = parts.length > 1 ? (double.tryParse(parts[1]) ?? 80.0) : 80.0;
+            final dia =
+                parts.length > 1 ? (double.tryParse(parts[1]) ?? 80.0) : 80.0;
             values.add(sys);
             secondaryValues.add(dia);
           } else {
@@ -432,172 +423,158 @@ class PatientRecordScreen extends ConsumerWidget {
           }
         }
 
-        // Color coding matching premium palettes
-        Color chartColor = const Color(0xFF6366F1); // Default Indigo
-        if (type == 'heart_rate') chartColor = const Color(0xFFEF4444); // Red
-        if (type == 'blood_pressure') chartColor = const Color(0xFF3B82F6); // Blue
-        if (type == 'glucose') chartColor = const Color(0xFFF59E0B); // Amber
-        if (type == 'weight') chartColor = const Color(0xFF10B981); // Emerald
-
+        // Single accent for all vital charts (flat language).
+        final chartColor = t.accent;
         final title = type.replaceAll('_', ' ').toUpperCase();
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.01),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 9,
-                          color: const Color(0xFF94A3B8),
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: SquircleCard(
+            radius: AppSpacing.squircleGrouped,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: t.monoMeta.copyWith(
+                            fontSize: 9,
+                            color: t.textSecondary,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              latest.value,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
+                                color: t.textPrimary,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              latest.unit,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: t.textSecondary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: t.tint,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${list.length} Logs',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: t.accent,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            latest.value,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: textP,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            latest.unit,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              color: textS,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: chartColor.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      '${list.length} Logs',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        color: chartColor,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Inline Line Chart
+                SizedBox(
+                  height: 52,
+                  width: double.infinity,
+                  child: CustomPaint(
+                    painter: _VitalsChartPainter(
+                      values: values,
+                      secondaryValues:
+                          type == 'blood_pressure' ? secondaryValues : null,
+                      color: chartColor,
+                      secondaryColor: type == 'blood_pressure'
+                          ? chartColor.withValues(alpha: 0.45)
+                          : null,
+                      ringColor: t.card,
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Inline Line Chart
-              SizedBox(
-                height: 52,
-                width: double.infinity,
-                child: CustomPaint(
-                  painter: _VitalsChartPainter(
-                    values: values,
-                    secondaryValues: type == 'blood_pressure' ? secondaryValues : null,
-                    color: chartColor,
-                    secondaryColor: type == 'blood_pressure' ? const Color(0xFF38BDF8) : null,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       }).toList(),
     );
   }
 
-
-  Widget _buildConditionsList(
-    List<dynamic> conditions,
-    Color surface,
-    Color border,
-    Color textP,
-    Color textS,
-    Color warningColor,
-  ) {
-    if (conditions.isEmpty) return _buildEmptyCard('No conditions listed', surface, border, textP, textS);
+  Widget _buildConditionsList(BuildContext context, List<dynamic> conditions) {
+    final t = context.tokens;
+    if (conditions.isEmpty) {
+      return _buildEmptyCard(context, 'No conditions listed');
+    }
     return Column(
       children: conditions.map((c) {
         final isAllergy = c.conditionType == 'allergy';
-        final displayColor = isAllergy ? const Color(0xFFEF4444) : warningColor;
-        
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: border),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: displayColor,
-                  shape: BoxShape.circle,
+        // Allergies flag risk (error); everything else uses the accent.
+        final displayColor = isAllergy ? t.error : t.accent;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: SquircleCard(
+            radius: AppSpacing.squircleGrouped,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: displayColor,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      c.description,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: textP,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        c.description,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: t.textPrimary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${c.conditionTypeDisplayName}${c.severity != null ? " • Severity: ${c.severity}" : ""}',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: textS,
+                      const SizedBox(height: 2),
+                      Text(
+                        '${c.conditionTypeDisplayName}${c.severity != null ? " • Severity: ${c.severity}" : ""}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: t.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       }).toList(),
@@ -605,79 +582,75 @@ class PatientRecordScreen extends ConsumerWidget {
   }
 
   Widget _buildPrescriptionList(
-    List<dynamic> prescriptions,
-    Color surface,
-    Color border,
-    Color textP,
-    Color textS,
-  ) {
-    if (prescriptions.isEmpty) return _buildEmptyCard('No history found', surface, border, textP, textS);
+      BuildContext context, List<dynamic> prescriptions) {
+    final t = context.tokens;
+    if (prescriptions.isEmpty) {
+      return _buildEmptyCard(context, 'No history found');
+    }
     return Column(
       children: prescriptions.take(3).map((p) {
         final dateStr = DateFormat('MMM dd, yyyy').format(p.createdAt!);
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: border),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            title: Text(
-              p.diagnosis,
-              style: GoogleFonts.manrope(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: textP,
-              ),
-            ),
-            subtitle: Text(
-              dateStr,
-              style: GoogleFonts.manrope(
-                color: textS,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            trailing: const Icon(
-              Iconsax.clock,
-              color: Color(0xFFCBD5E1),
-              size: 16,
-            ),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: SquircleCard(
+            radius: AppSpacing.squircleGrouped,
+            padding: EdgeInsets.zero,
             onTap: () {},
+            child: ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              title: Text(
+                p.diagnosis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: t.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                dateStr,
+                style: TextStyle(
+                  color: t.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              trailing: Icon(Iconsax.clock, color: t.textSecondary, size: 16),
+            ),
           ),
         );
       }).toList(),
     );
   }
 
-  Widget _buildSectionLabel(String text) {
+  Widget _buildSectionLabel(BuildContext context, String text) {
+    final t = context.tokens;
     return Text(
       text.toUpperCase(),
-      style: GoogleFonts.plusJakartaSans(
+      style: t.monoSectionHeader.copyWith(
         fontSize: 11,
-        fontWeight: FontWeight.bold,
-        color: const Color(0xFF475569), // Slate 600
+        fontWeight: FontWeight.w500,
+        color: t.textSecondary,
         letterSpacing: 0.8,
       ),
     );
   }
 
-  Widget _buildEmptyCard(String message, Color surface, Color border, Color textP, Color textS) {
+  Widget _buildEmptyCard(BuildContext context, String message) {
+    final t = context.tokens;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 24),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC), // Slate 50
+        color: t.scaffold,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: t.divider),
       ),
       child: Center(
         child: Text(
           message,
-          style: GoogleFonts.plusJakartaSans(
-            color: const Color(0xFF94A3B8), // Slate 400
+          style: TextStyle(
+            color: t.textSecondary,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -690,7 +663,8 @@ class PatientRecordScreen extends ConsumerWidget {
     if (dob == null) return 'N/A';
     final now = DateTime.now();
     int age = now.year - dob.year;
-    if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
       age--;
     }
     return age.toString();
@@ -702,12 +676,14 @@ class _VitalsChartPainter extends CustomPainter {
   final List<double>? secondaryValues; // For diastolic BP
   final Color color;
   final Color? secondaryColor;
+  final Color ringColor;
 
   _VitalsChartPainter({
     required this.values,
     this.secondaryValues,
     required this.color,
     this.secondaryColor,
+    required this.ringColor,
   });
 
   @override
@@ -745,7 +721,8 @@ class _VitalsChartPainter extends CustomPainter {
     // Draw main line
     final points = <Offset>[];
     for (int i = 0; i < values.length; i++) {
-      final x = (values.length > 1) ? (i / (values.length - 1)) * width : width / 2;
+      final x =
+          (values.length > 1) ? (i / (values.length - 1)) * width : width / 2;
       final y = height - ((values[i] - minVal) / (maxVal - minVal)) * height;
       points.add(Offset(x, y));
     }
@@ -762,21 +739,28 @@ class _VitalsChartPainter extends CustomPainter {
 
       final secPoints = <Offset>[];
       for (int i = 0; i < secondaryValues!.length; i++) {
-        final x = (secondaryValues!.length > 1) ? (i / (secondaryValues!.length - 1)) * width : width / 2;
-        final y = height - ((secondaryValues![i] - minVal) / (maxVal - minVal)) * height;
+        final x = (secondaryValues!.length > 1)
+            ? (i / (secondaryValues!.length - 1)) * width
+            : width / 2;
+        final y = height -
+            ((secondaryValues![i] - minVal) / (maxVal - minVal)) * height;
         secPoints.add(Offset(x, y));
       }
 
-      _drawSmoothLine(canvas, secPoints, secPaint, size, secondaryColor ?? color.withValues(alpha: 0.5), fill: false);
+      _drawSmoothLine(canvas, secPoints, secPaint, size,
+          secondaryColor ?? color.withValues(alpha: 0.5),
+          fill: false);
     }
   }
 
-  void _drawSmoothLine(Canvas canvas, List<Offset> points, Paint paint, Size size, Color lineColor, {bool fill = true}) {
+  void _drawSmoothLine(
+      Canvas canvas, List<Offset> points, Paint paint, Size size, Color lineColor,
+      {bool fill = true}) {
     if (points.isEmpty) return;
-    
+
     final path = Path();
     path.moveTo(points[0].dx, points[0].dy);
-    
+
     if (points.length == 1) {
       canvas.drawCircle(points[0], 3.0, paint..style = PaintingStyle.fill);
       return;
@@ -787,7 +771,8 @@ class _VitalsChartPainter extends CustomPainter {
       final p1 = points[i + 1];
       final controlPoint1 = Offset(p0.dx + (p1.dx - p0.dx) / 2, p0.dy);
       final controlPoint2 = Offset(p0.dx + (p1.dx - p0.dx) / 2, p1.dy);
-      path.cubicTo(controlPoint1.dx, controlPoint1.dy, controlPoint2.dx, controlPoint2.dy, p1.dx, p1.dy);
+      path.cubicTo(controlPoint1.dx, controlPoint1.dy, controlPoint2.dx,
+          controlPoint2.dy, p1.dx, p1.dy);
     }
 
     canvas.drawPath(path, paint);
@@ -818,9 +803,9 @@ class _VitalsChartPainter extends CustomPainter {
       ..color = lineColor
       ..style = PaintingStyle.fill;
     canvas.drawCircle(points.last, 3.5, dotPaint);
-    
+
     final ringPaint = Paint()
-      ..color = Colors.white
+      ..color = ringColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
     canvas.drawCircle(points.last, 3.5, ringPaint);
@@ -828,6 +813,7 @@ class _VitalsChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _VitalsChartPainter oldDelegate) {
-    return oldDelegate.values != values || oldDelegate.secondaryValues != secondaryValues;
+    return oldDelegate.values != values ||
+        oldDelegate.secondaryValues != secondaryValues;
   }
 }

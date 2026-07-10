@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_spacing.dart';
+import '../theme/app_tokens.dart';
 
 class LoadingSkeleton extends StatefulWidget {
   final double? width;
@@ -52,10 +53,26 @@ class _LoadingSkeletonState extends State<LoadingSkeleton>
         height: widget.height,
         margin: widget.margin,
         decoration: BoxDecoration(
-          color: const Color(0xFFE2E8F0),
+          color: context.tokens.skeleton,
           borderRadius: BorderRadius.circular(widget.radius ?? AppSpacing.radiusSm),
         ),
       ),
     );
   }
+}
+
+/// Circular shimmer placeholder (avatars, icon slots).
+class SkeletonCircle extends StatelessWidget {
+  const SkeletonCircle({super.key, required this.size, this.margin});
+
+  final double size;
+  final EdgeInsetsGeometry? margin;
+
+  @override
+  Widget build(BuildContext context) => LoadingSkeleton(
+        width: size,
+        height: size,
+        radius: size / 2,
+        margin: margin,
+      );
 }

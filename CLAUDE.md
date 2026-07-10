@@ -15,9 +15,9 @@ CareSync is a biometric-authenticated medical logging and e-prescription app ser
 ### Flutter client (repo root)
 ```bash
 flutter pub get                     # install deps
-flutter run                         # run the app (requires .env, see below)
+flutter run --dart-define-from-file=.env # run the app (requires .env, see below)
 flutter analyze                     # lint (flutter_lints defaults)
-flutter test                        # all tests
+flutter test --dart-define-from-file=.env # run tests with environment variables
 flutter test test/ocr_service_test.dart   # single test file
 flutter pub run build_runner build --delete-conflicting-outputs   # regen freezed/json/riverpod code
 ```
@@ -37,10 +37,11 @@ python -m unittest test_biometric_pipeline.py   # tests
 
 ## Environment
 
-The Flutter app loads `.env` from the repo root **as a Flutter asset** (declared in `pubspec.yaml`), so a missing `.env` breaks the build, not just runtime. Copy `.env.example`:
+The Flutter app loads environment variables at compile-time using `--dart-define-from-file=.env`. Copy `.env.example` to `.env` in the repository root and fill in:
 ```
 SUPABASE_URL, SUPABASE_ANON_KEY, BIOMETRIC_API_URL (http://localhost:8000 for local), HF_TOKEN (optional)
 ```
+Do NOT bundle `.env` in `pubspec.yaml` assets (to prevent secret leaks in production builds).
 Access is centralized in `lib/core/config/env_config.dart`.
 
 ## Architecture

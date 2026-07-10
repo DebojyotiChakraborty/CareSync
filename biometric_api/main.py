@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 import math
 import json
+import hashlib
 from typing import Dict, Any, List, Optional, Tuple
 from fastapi import FastAPI, HTTPException, File, UploadFile, Depends, Request, Header, Form
 from fastapi.concurrency import run_in_threadpool
@@ -119,11 +120,19 @@ security = HTTPBearer()
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
-    expected_token = os.getenv("HF_TOKEN")
+    expected_token = os.getenv("API_AUTH_TOKEN") or os.getenv("HF_TOKEN")
+    # SECURITY: fail closed. Previously, a missing token silently bypassed auth entirely,
+    # leaving every endpoint (enroll/identify/verify) open. Refuse to serve until a secret
+    # is configured rather than running unauthenticated.
     if not expected_token:
-        logger.warning("HF_TOKEN is not set in environment variables! Auth is currently bypassed.")
-        return token
-    if token != expected_token:
+        logger.error("API auth secret (API_AUTH_TOKEN/HF_TOKEN) is not configured. Refusing request.")
+        raise HTTPException(
+            status_code=503,
+            detail="Service misconfigured: authentication is not available."
+        )
+    # Constant-time comparison to avoid leaking the secret via timing.
+    import hmac as _hmac
+    if not _hmac.compare_digest(token, expected_token):
         raise HTTPException(
             status_code=401,
             detail="Invalid or missing API authorization token."
@@ -171,6 +180,9 @@ class SimpleTTLCache:
         self.cache.clear()
 
 scan_cache = SimpleTTLCache(ttl_seconds=300)
+
+# Hard ceiling on uploaded image size (bytes) to prevent memory-exhaustion / decompression-bomb DoS.
+MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(8 * 1024 * 1024)))  # 8 MB default
 
 # Check if PyTorch (Anti-Spoofing Dependency) is available
 try:
@@ -420,7 +432,9 @@ def detect_and_align_face(img, is_id_doc=False, run_liveness=False) -> Dict[str,
         )
 
     if run_liveness and has_torch:
-        is_real = face.get("is_real", True)
+        # SECURITY: fail closed. If the anti-spoofing model did not return an explicit
+        # is_real verdict, treat the face as spoofed rather than trusting it by default.
+        is_real = face.get("is_real", False)
         if not is_real:
             raise HTTPException(
                 status_code=400,
@@ -1296,7 +1310,9 @@ async def enroll(
             status_code=500,
             detail={
                 "error_code": "SERVER_ERROR",
-                "message": f"Enrollment failed: {str(e)}"
+                # Do not leak internal exception detail to clients; it is captured in server logs above.
+                "message": "Enrollment failed due to an internal error.",
+                "request_id": request_id
             }
         )
     finally:
@@ -1444,7 +1460,8 @@ async def verify_id(
             status_code=500,
             detail={
                 "error_code": "SERVER_ERROR",
-                "message": f"Comparison failed: {str(e)}"
+                "message": "Comparison failed due to an internal error.",
+                "request_id": request_id
             }
         )
     finally:
@@ -1485,26 +1502,6 @@ async def identify(
             }
         )
 
-    # 1. Check Scan Cache
-    cache_key = f"{client_ip}"
-    cached_val = scan_cache.get(cache_key)
-    if cached_val:
-        logger.info(f"Returning cached identification scan for IP: {client_ip}")
-        # Log session audit log
-        log_biometric_access(
-            actor_id=x_actor_id,
-            action_type="IDENTIFY",
-            status="SUCCESS",
-            target_patient_id=cached_val["patient_id"],
-            confidence_score=cached_val["similarity"],
-            reason=json.dumps({
-                "request_id": request_id,
-                "source": "cache",
-                "latency_seconds": time.time() - start_time
-            })
-        )
-        return cached_val
-
     try:
         # Read bytes
         file_bytes = await file.read()
@@ -1516,6 +1513,39 @@ async def identify(
                     "message": "Uploaded file is empty."
                 }
             )
+
+        # Enforce a hard size ceiling before decoding (DoS / decompression-bomb guard).
+        if len(file_bytes) > MAX_IMAGE_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "error_code": "IMAGE_TOO_LARGE",
+                    "message": "Uploaded image exceeds the maximum allowed size."
+                }
+            )
+
+        # 1. Check Scan Cache.
+        # SECURITY: the cache MUST be keyed on the actual image content, not the client IP.
+        # An IP-only key returned the last matched patient for ANY subsequent image from that
+        # IP (and leaked identities across users behind the same NAT). We key on a hash of the
+        # decoded image bytes so only an identical image short-circuits to a cached result.
+        cache_key = f"{hashlib.sha256(file_bytes).hexdigest()}"
+        cached_val = scan_cache.get(cache_key)
+        if cached_val:
+            logger.info(f"Returning cached identification scan for image {cache_key[:12]}")
+            log_biometric_access(
+                actor_id=x_actor_id,
+                action_type="IDENTIFY",
+                status="SUCCESS",
+                target_patient_id=cached_val["patient_id"],
+                confidence_score=cached_val["similarity"],
+                reason=json.dumps({
+                    "request_id": request_id,
+                    "source": "cache",
+                    "latency_seconds": time.time() - start_time
+                })
+            )
+            return cached_val
 
         # Decode image
         nparr = np.frombuffer(file_bytes, np.uint8)
@@ -1793,20 +1823,25 @@ async def identify(
             status_code=500,
             detail={
                 "error_code": "SERVER_ERROR",
-                "message": str(e)
+                "message": "Identification failed due to an internal error.",
+                "request_id": request_id
             }
         )
 
 @app.post("/analyze_frame")
 async def analyze_frame(
     file: UploadFile = File(...),
-    target_pose: Optional[str] = Form(None)
+    target_pose: Optional[str] = Form(None),
+    token: str = Depends(verify_token)
 ):
     start_time = time.time()
     try:
         contents = await file.read()
+        # SECURITY: enforce a size ceiling before decoding (DoS / decompression-bomb guard).
+        if len(contents) > MAX_IMAGE_BYTES:
+            return {"success": False, "message": "Image too large"}
         read_time = (time.time() - start_time) * 1000.0
-        
+
         start_decode = time.time()
         nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -1896,7 +1931,8 @@ async def analyze_frame(
             "message": he.detail.get("message") if isinstance(he.detail, dict) else str(he.detail)
         }
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        logger.error(f"[ANALYZE_FRAME FAILED] error={str(e)}")
+        return {"success": False, "message": "Frame analysis failed due to an internal error."}
 
 @app.get("/diagnostics/mediapipe")
 async def diagnostics_mediapipe():

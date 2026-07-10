@@ -70,18 +70,19 @@ class EncryptionService {
       await initializeEncryptionKey();
     }
 
-    // Check if biometric is available
+    // SECURITY: actually gate key release on biometric authentication. Previously this
+    // method advertised biometric protection but never called authenticate() — the key was
+    // always returned straight from storage. When biometrics are available we now require a
+    // successful authentication before releasing the medical-data encryption key.
     final isAvailable = await _biometric.isBiometricAvailable();
-    if (!isAvailable) {
-      // Fall back to reading key directly if biometrics unavailable
-      final keyString = await _storage.read(key: _encryptionKeyKey);
-      if (keyString == null) {
-        throw EncryptionException('Encryption key not found');
+    if (isAvailable) {
+      final authenticated = await _biometric.authenticate(reason: reason);
+      if (!authenticated) {
+        // Do NOT release the key on a failed/cancelled biometric prompt.
+        return null;
       }
-      return base64Decode(keyString);
     }
 
-    // Retrieve the encryption key directly (biometrics disabled)
     final keyString = await _storage.read(key: _encryptionKeyKey);
     if (keyString == null) {
       throw EncryptionException('Encryption key not found');

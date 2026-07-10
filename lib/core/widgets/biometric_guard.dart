@@ -60,12 +60,12 @@ class _BiometricGuardState extends State<BiometricGuard> with WidgetsBindingObse
   }
 
   Future<void> _checkBiometricStatus() async {
-    // Defer setState to post-frame so this can safely be called from initState
-    // without triggering the !_dirty assertion from GoRouter's Builder.
+    // Defer to post-frame so this can safely be called from initState without
+    // triggering the !_dirty assertion from GoRouter's Builder, then perform a
+    // REAL biometric authentication before revealing the protected child.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        setState(() => _isAuthenticated = true);
-        widget.onAuthenticated?.call();
+        _authenticate();
       }
     });
   }
@@ -217,5 +217,17 @@ Future<bool> showBiometricAuthDialog({
   String reason = 'Please authenticate to continue',
   bool allowBiometricOnly = true,
 }) async {
-  return true;
+  try {
+    final isAvailable = await BiometricService.instance.isBiometricAvailable();
+    if (!isAvailable) return false;
+
+    return await BiometricService.instance.authenticate(
+      reason: reason,
+      biometricOnly: allowBiometricOnly,
+    );
+  } on BiometricException {
+    return false;
+  } catch (_) {
+    return false;
+  }
 }

@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/design/confirm_sheet.dart';
+import '../../../../core/design/squircle_card.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../routing/route_names.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/custom_biometric_service.dart';
@@ -18,7 +20,8 @@ final pharmacistTodayStatsProvider = FutureProvider<int>((ref) async {
   return await SupabaseService.instance.getTodaysDispensingCount();
 });
 
-final pharmacistPendingPrescriptionsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final pharmacistPendingPrescriptionsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final response = await SupabaseService.instance.client
       .from('prescriptions')
       .select('''
@@ -36,7 +39,8 @@ final pharmacistPendingPrescriptionsProvider = FutureProvider<List<Map<String, d
   return List<Map<String, dynamic>>.from(response);
 });
 
-final recentBiometricLogsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final recentBiometricLogsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   try {
     final res = await SupabaseService.instance.client
         .from('biometric_access_logs')
@@ -76,15 +80,16 @@ final pendingPrescriptionsCountProvider = FutureProvider<int>((ref) async {
   }
 });
 
-
 class PharmacistDashboardScreen extends ConsumerStatefulWidget {
   const PharmacistDashboardScreen({super.key});
 
   @override
-  ConsumerState<PharmacistDashboardScreen> createState() => _PharmacistDashboardScreenState();
+  ConsumerState<PharmacistDashboardScreen> createState() =>
+      _PharmacistDashboardScreenState();
 }
 
-class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardScreen>
+class _PharmacistDashboardScreenState
+    extends ConsumerState<PharmacistDashboardScreen>
     with SingleTickerProviderStateMixin {
   bool _isIdentifying = false;
   String _scanningStatus = 'Initializing...';
@@ -129,7 +134,7 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
     super.dispose();
   }
 
-  Future<void> _scanFace(BuildContext context) async {
+  Future<void> _scanFace() async {
     if (_cooldownActive) {
       debugPrint('[BIOMETRIC] Scan cooldown active. Ignoring duplicate request.');
       return;
@@ -149,7 +154,7 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
         imageQuality: 85,
       );
 
-      if (image == null) return; // User cancelled
+      if (image == null) return;
       if (cancelToken.isCancelled) return;
 
       setState(() {
@@ -157,8 +162,8 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
         _scanningStatus = 'Uploading face scan...';
       });
 
-      // Call custom Biometric matching service
-      final identifyResult = await CustomBiometricService.instance.identifyPatientDetailed(
+      final identifyResult =
+          await CustomBiometricService.instance.identifyPatientDetailed(
         File(image.path),
         cancelToken: cancelToken,
       );
@@ -170,7 +175,8 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
         _isIdentifying = false;
       });
 
-      if (identifyResult.status == BiometricResultStatus.success && identifyResult.qrCodeId != null) {
+      if (identifyResult.status == BiometricResultStatus.success &&
+          identifyResult.qrCodeId != null) {
         setState(() {
           _cooldownActive = true;
         });
@@ -189,25 +195,26 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Matched Patient: $fullName (${confidence.toStringAsFixed(1)}% confidence, pose: $pose)'),
-            backgroundColor: AppColors.success,
+            content: Text(
+                'Matched Patient: $fullName (${confidence.toStringAsFixed(1)}% confidence, pose: $pose)'),
+            backgroundColor: context.tokens.accent,
             behavior: SnackBarBehavior.floating,
           ),
         );
 
-        // Navigate directly to dispense screen with the patient's QR ID
         context.push(RouteNames.pharmacistDispense, extra: qrCodeId);
       } else {
-        final friendlyMessage = CustomBiometricService.instance.mapStatusToErrorMessage(
+        final friendlyMessage =
+            CustomBiometricService.instance.mapStatusToErrorMessage(
           identifyResult.status,
           identifyResult.errorMessage,
           errorCode: identifyResult.errorCode,
         );
 
         if (identifyResult.status == BiometricResultStatus.noMatch) {
-          _showNoMatchDialog(context, message: friendlyMessage);
+          _showNoMatchSheet(message: friendlyMessage);
         } else {
-          _showErrorDialog(context, friendlyMessage);
+          _showErrorSheet(friendlyMessage);
         }
       }
     } catch (e) {
@@ -217,74 +224,38 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
         });
       }
       debugPrint('[PHARM] Face scan identification error: $e');
-      _showErrorDialog(context, e.toString());
+      _showErrorSheet(e.toString());
     }
   }
 
-  void _showNoMatchDialog(BuildContext context, {String message = 'No Matching Patient Found'}) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-            SizedBox(width: 8),
-            Text('No Match Found'),
-          ],
-        ),
-        content: Text(
+  Future<void> _showNoMatchSheet(
+      {String message = 'No Matching Patient Found'}) async {
+    final retry = await showConfirmSheet(
+      context,
+      icon: Iconsax.warning_2,
+      title: 'No Match Found',
+      message:
           '$message\n\nWe could not find a matching patient profile in the CareSync database. Please check lighting, ensure the face is centered, or try searching manually.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _scanFace(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.pharmacist,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Try Again'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Try Again',
+      cancelLabel: 'Close',
     );
+    if (retry) _scanFace();
   }
 
-  void _showErrorDialog(BuildContext context, String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.error_outline_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 8),
-            Text('Scanning Error'),
-          ],
-        ),
-        content: Text(
+  void _showErrorSheet(String message) {
+    showAlertSheet(
+      context,
+      icon: Iconsax.close_circle,
+      title: 'Scanning Error',
+      message:
           'An error occurred while matching the patient face:\n\n${message.contains("Exception:") ? message.split("Exception:").last : message}',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+      buttonLabel: 'Close',
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     final profile = ref.watch(currentProfileProvider);
     final todayStats = ref.watch(pharmacistTodayStatsProvider);
     final pendingRx = ref.watch(pharmacistPendingPrescriptionsProvider);
@@ -292,7 +263,7 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
     final pendingCountAsync = ref.watch(pendingPrescriptionsCountProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: t.scaffold,
       body: Stack(
         children: [
           // MAIN CONTENT
@@ -309,92 +280,121 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── 1. LIGHT HERO HEADER ─────────────────────────────────────────
+                    // ── 1. HERO HEADER ───────────────────────────────────
                     Container(
                       width: double.infinity,
-                      color: Colors.white,
+                      color: t.card,
                       child: SafeArea(
                         bottom: false,
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              // Header Navigation Row
-                              Row(
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: const Color(0xFFE5E7EB),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: CircleAvatar(
-                                      radius: 22,
-                                      backgroundColor: AppColors.pharmacist.withValues(alpha: 0.1),
-                                      child: Text(
-                                        profile.valueOrNull?.fullName.isNotEmpty == true
-                                            ? profile.valueOrNull!.fullName.substring(0, 1).toUpperCase()
-                                            : 'P',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.pharmacist,
-                                          fontSize: 16,
-                                        ),
+                              GestureDetector(
+                                onTap: () =>
+                                    context.push(RouteNames.profile),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: t.divider, width: 1.5),
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: t.tint,
+                                    child: Text(
+                                      profile.valueOrNull?.fullName
+                                                  .isNotEmpty ==
+                                              true
+                                          ? profile.valueOrNull!.fullName
+                                              .substring(0, 1)
+                                              .toUpperCase()
+                                          : 'P',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: t.accent,
+                                        fontSize: 16,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Hello,',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 13,
-                                            color: const Color(0xFF64748B),
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () =>
+                                      context.push(RouteNames.profile),
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Hello,',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: t.textSecondary,
+                                          fontWeight: FontWeight.w500,
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          profile.valueOrNull?.fullName.isNotEmpty == true
-                                              ? profile.valueOrNull!.fullName
-                                              : 'Pharmacist',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: const Color(0xFF1E293B),
-                                            letterSpacing: -0.5,
-                                          ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        profile.valueOrNull?.fullName
+                                                    .isNotEmpty ==
+                                                true
+                                            ? profile.valueOrNull!.fullName
+                                            : 'Pharmacist',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700,
+                                          color: t.textPrimary,
+                                          letterSpacing: -0.5,
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              GestureDetector(
+                                onTap: () =>
+                                    context.push(RouteNames.profile),
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: t.scaffold,
+                                    shape: BoxShape.circle,
+                                    border:
+                                        Border.all(color: t.divider),
+                                  ),
+                                  child: Icon(
+                                    Iconsax.setting_2,
+                                    color: t.textPrimary,
+                                    size: 18,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ),
                     ),
-                    Container(height: 1, color: const Color(0xFFE5E7EB)),
+                    Container(height: 1, color: t.divider),
 
-                    // ── 2. SCROLLABLE CONTENT BODY ────────────────────────────────────
+                    // ── 2. SCROLLABLE CONTENT BODY ────────────────────────
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Embedded Search Bar
                           Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
+                              color: t.card,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(color: t.divider),
                             ),
                             child: TextField(
                               readOnly: true,
@@ -402,29 +402,25 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                                 context.push(RouteNames.pharmacistSearch);
                               },
                               decoration: InputDecoration(
-                                prefixIcon: const Icon(
-                                  Iconsax.search_normal_1,
-                                  color: Color(0xFF94A3B8),
-                                  size: 18,
-                                ),
+                                prefixIcon: Icon(Iconsax.search_normal_1,
+                                    color: t.textSecondary, size: 18),
                                 suffixIcon: InkWell(
                                   onTap: () {
                                     context.push(RouteNames.pharmacistDispense);
                                   },
-                                  child: const Icon(
-                                    Iconsax.scan,
-                                    color: AppColors.pharmacist,
-                                    size: 18,
-                                  ),
+                                  child:
+                                      Icon(Iconsax.scan, color: t.accent, size: 18),
                                 ),
-                                hintText: 'Search patient name, ID, or prescription...',
-                                hintStyle: GoogleFonts.plusJakartaSans(
-                                  color: const Color(0xFF94A3B8),
+                                hintText:
+                                    'Search patient name, ID, or prescription...',
+                                hintStyle: TextStyle(
+                                  color: t.textSecondary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                 ),
                                 border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                                contentPadding:
+                                    const EdgeInsets.symmetric(vertical: 14),
                               ),
                             ),
                           ),
@@ -434,108 +430,21 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                           Row(
                             children: [
                               Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.01),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.pharmacist.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: const Icon(
-                                          Iconsax.health,
-                                          color: AppColors.pharmacist,
-                                          size: 18,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        todayStats.valueOrNull?.toString() ?? '0',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF111827),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 1),
-                                      Text(
-                                        "Today's Dispensed",
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 11,
-                                          color: const Color(0xFF6B7280),
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                child: _buildStatCard(
+                                  icon: Iconsax.health,
+                                  value:
+                                      todayStats.valueOrNull?.toString() ?? '0',
+                                  label: "Today's Dispensed",
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.01),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: const Icon(
-                                          Iconsax.document_text,
-                                          color: Color(0xFF8B5CF6),
-                                          size: 18,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        pendingCountAsync.valueOrNull?.toString() ?? '0',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF111827),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 1),
-                                      Text(
-                                        "Pending Active",
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 11,
-                                          color: const Color(0xFF6B7280),
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                child: _buildStatCard(
+                                  icon: Iconsax.document_text,
+                                  value: pendingCountAsync.valueOrNull
+                                          ?.toString() ??
+                                      '0',
+                                  label: 'Pending Active',
                                 ),
                               ),
                             ],
@@ -543,25 +452,15 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                           const SizedBox(height: 20),
 
                           // Quick Actions
-                          Text(
-                            'Quick Actions',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF1E293B),
-                              letterSpacing: -0.3,
-                            ),
-                          ),
+                          _sectionTitle('Quick Actions'),
                           const SizedBox(height: 12),
                           Row(
                             children: [
                               Expanded(
                                 child: _buildActionCard(
-                                  context: context,
                                   icon: Iconsax.scan_barcode,
                                   title: 'Scan QR',
                                   subtitle: 'Scan patient QR',
-                                  color: AppColors.pharmacist,
                                   onTap: () {
                                     context.push(RouteNames.pharmacistDispense);
                                   },
@@ -570,12 +469,10 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                               const SizedBox(width: 12),
                               Expanded(
                                 child: _buildActionCard(
-                                  context: context,
                                   icon: Iconsax.frame_1,
                                   title: 'Scan Face',
                                   subtitle: 'AI biometric search',
-                                  color: const Color(0xFF3B82F6),
-                                  onTap: () => _scanFace(context),
+                                  onTap: () => _scanFace(),
                                 ),
                               ),
                             ],
@@ -585,11 +482,9 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                             children: [
                               Expanded(
                                 child: _buildActionCard(
-                                  context: context,
                                   icon: Iconsax.user_search,
                                   title: 'Search Patient',
                                   subtitle: 'Lookup manually',
-                                  color: AppColors.primary,
                                   onTap: () {
                                     context.push(RouteNames.pharmacistSearch);
                                   },
@@ -598,11 +493,9 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                               const SizedBox(width: 12),
                               Expanded(
                                 child: _buildActionCard(
-                                  context: context,
                                   icon: Iconsax.clock,
                                   title: 'History',
                                   subtitle: 'Dispense records',
-                                  color: AppColors.info,
                                   onTap: () {
                                     context.push(RouteNames.pharmacistHistory);
                                   },
@@ -621,98 +514,113 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    'Security Activity Log',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF1E293B),
-                                      letterSpacing: -0.3,
-                                    ),
-                                  ),
+                                  _sectionTitle('Security Activity Log'),
                                   const SizedBox(height: 12),
                                   Column(
                                     children: logs.map<Widget>((log) {
-                                      final isSuccess = log['status'] == 'SUCCESS';
-                                      final confidence = log['confidence_score'] as double?;
-                                      final time = log['created_at'] != null 
-                                          ? DateTime.parse(log['created_at'] as String) 
+                                      final isSuccess =
+                                          log['status'] == 'SUCCESS';
+                                      final confidence =
+                                          log['confidence_score'] as double?;
+                                      final time = log['created_at'] != null
+                                          ? DateTime.parse(
+                                              log['created_at'] as String)
                                           : DateTime.now();
 
-                                      final targetProfile = log['patient_profile'] as Map<String, dynamic>?;
-                                      final patientName = targetProfile?['full_name'] as String? ?? log['actor_name'] as String? ?? 'Patient Scan';
+                                      final targetProfile =
+                                          log['patient_profile']
+                                              as Map<String, dynamic>?;
+                                      final patientName = targetProfile?[
+                                              'full_name'] as String? ??
+                                          log['actor_name'] as String? ??
+                                          'Patient Scan';
+                                      final statusColor =
+                                          isSuccess ? t.accent : t.error;
 
-                                      return Container(
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: const Color(0xFFE5E7EB)),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(6),
-                                              decoration: BoxDecoration(
-                                                color: (isSuccess ? const Color(0xFF10B981) : Colors.red).withValues(alpha: 0.1),
-                                                shape: BoxShape.circle,
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 8),
+                                        child: SquircleCard(
+                                          radius: AppSpacing.squircleGrouped,
+                                          padding: const EdgeInsets.all(10),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.all(6),
+                                                decoration: BoxDecoration(
+                                                  color: statusColor
+                                                      .withValues(alpha: 0.1),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(
+                                                  isSuccess
+                                                      ? Iconsax.tick_circle
+                                                      : Iconsax.close_circle,
+                                                  color: statusColor,
+                                                  size: 14,
+                                                ),
                                               ),
-                                              child: Icon(
-                                                isSuccess ? Iconsax.tick_circle : Iconsax.close_circle,
-                                                color: isSuccess ? const Color(0xFF10B981) : Colors.red,
-                                                size: 14,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    patientName,
-                                                    style: GoogleFonts.plusJakartaSans(
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: const Color(0xFF1E293B),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      patientName,
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: t.textPrimary,
+                                                      ),
                                                     ),
-                                                  ),
+                                                    const SizedBox(height: 1),
+                                                    Text(
+                                                      log['reason'] as String? ??
+                                                          (isSuccess
+                                                              ? 'Verification successful'
+                                                              : 'Verification failed'),
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        color: t.textSecondary,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.end,
+                                                children: [
+                                                  if (confidence != null)
+                                                    Text(
+                                                      '${(confidence * 100).toStringAsFixed(1)}% match',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: statusColor,
+                                                      ),
+                                                    ),
                                                   const SizedBox(height: 1),
                                                   Text(
-                                                    log['reason'] as String? ?? (isSuccess ? 'Verification successful' : 'Verification failed'),
-                                                    style: GoogleFonts.plusJakartaSans(
-                                                      fontSize: 10,
-                                                      color: const Color(0xFF64748B),
-                                                      fontWeight: FontWeight.w500,
+                                                    DateFormat('h:mm a')
+                                                        .format(time),
+                                                    style: TextStyle(
+                                                      fontSize: 9,
+                                                      color: t.textSecondary,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                     ),
                                                   ),
                                                 ],
                                               ),
-                                            ),
-                                            Column(
-                                              crossAxisAlignment: CrossAxisAlignment.end,
-                                              children: [
-                                                if (confidence != null)
-                                                  Text(
-                                                    '${(confidence * 100).toStringAsFixed(1)}% match',
-                                                    style: GoogleFonts.plusJakartaSans(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: isSuccess ? const Color(0xFF10B981) : Colors.red,
-                                                    ),
-                                                  ),
-                                                const SizedBox(height: 1),
-                                                Text(
-                                                  DateFormat('h:mm a').format(time),
-                                                  style: GoogleFonts.plusJakartaSans(
-                                                    fontSize: 9,
-                                                    color: const Color(0xFF94A3B8),
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       );
                                     }).toList(),
@@ -724,15 +632,7 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                           ),
 
                           // Pending Prescriptions Header
-                          Text(
-                            'Pending Prescriptions',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF1E293B),
-                              letterSpacing: -0.3,
-                            ),
-                          ),
+                          _sectionTitle('Pending Prescriptions'),
                           const SizedBox(height: 12),
 
                           // Pending Prescriptions List
@@ -748,9 +648,9 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                                 padding: const EdgeInsets.all(16.0),
                                 child: Text(
                                   'Error loading prescriptions: $err',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    color: AppColors.error,
-                                    fontWeight: FontWeight.bold,
+                                  style: TextStyle(
+                                    color: t.error,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
@@ -762,13 +662,25 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
 
                               final filteredList = list.where((rx) {
                                 if (_selectedFilter == 'Controlled') {
-                                  return (rx['prescription_items'] as List? ?? []).any((item) {
-                                    final name = (item['medicine_name'] as String? ?? '').toLowerCase();
-                                    return _controlledKeywords.any((sub) => name.contains(sub));
+                                  return (rx['prescription_items'] as List? ??
+                                          [])
+                                      .any((item) {
+                                    final name = (item['medicine_name']
+                                                as String? ??
+                                            '')
+                                        .toLowerCase();
+                                    return _controlledKeywords
+                                        .any((sub) => name.contains(sub));
                                   });
                                 } else if (_selectedFilter == 'Urgent') {
-                                  final diagnosis = (rx['diagnosis'] as String? ?? '').toLowerCase();
-                                  return diagnosis.contains('urgent') || diagnosis.contains('severe') || diagnosis.contains('acute') || diagnosis.contains('heart') || diagnosis.contains('critical');
+                                  final diagnosis =
+                                      (rx['diagnosis'] as String? ?? '')
+                                          .toLowerCase();
+                                  return diagnosis.contains('urgent') ||
+                                      diagnosis.contains('severe') ||
+                                      diagnosis.contains('acute') ||
+                                      diagnosis.contains('heart') ||
+                                      diagnosis.contains('critical');
                                 }
                                 return true;
                               }).toList();
@@ -784,17 +696,35 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                                         const SizedBox(width: 8),
                                         _buildFilterChip(
                                           'Controlled',
-                                          list.where((rx) => (rx['prescription_items'] as List? ?? []).any((item) {
-                                            final name = (item['medicine_name'] as String? ?? '').toLowerCase();
-                                            return _controlledKeywords.any((sub) => name.contains(sub));
-                                          })).length,
+                                          list.where((rx) =>
+                                              (rx['prescription_items']
+                                                          as List? ??
+                                                      [])
+                                                  .any((item) {
+                                                final name =
+                                                    (item['medicine_name']
+                                                                as String? ??
+                                                            '')
+                                                        .toLowerCase();
+                                                return _controlledKeywords.any(
+                                                    (sub) =>
+                                                        name.contains(sub));
+                                              })).length,
                                         ),
                                         const SizedBox(width: 8),
                                         _buildFilterChip(
                                           'Urgent',
                                           list.where((rx) {
-                                            final diagnosis = (rx['diagnosis'] as String? ?? '').toLowerCase();
-                                            return diagnosis.contains('urgent') || diagnosis.contains('severe') || diagnosis.contains('acute') || diagnosis.contains('heart') || diagnosis.contains('critical');
+                                            final diagnosis =
+                                                (rx['diagnosis'] as String? ??
+                                                        '')
+                                                    .toLowerCase();
+                                            return diagnosis
+                                                    .contains('urgent') ||
+                                                diagnosis.contains('severe') ||
+                                                diagnosis.contains('acute') ||
+                                                diagnosis.contains('heart') ||
+                                                diagnosis.contains('critical');
                                           }).length,
                                         ),
                                       ],
@@ -803,12 +733,13 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                                   const SizedBox(height: 14),
                                   if (filteredList.isEmpty)
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 24),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 24),
                                       child: Center(
                                         child: Text(
                                           'No pending prescriptions match the filter.',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            color: const Color(0xFF64748B),
+                                          style: TextStyle(
+                                            color: t.textSecondary,
                                             fontSize: 13,
                                             fontWeight: FontWeight.w500,
                                           ),
@@ -817,119 +748,9 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                                     )
                                   else
                                     Column(
-                                      children: [
-                                        ...filteredList.map((rx) {
-                                          final patient = rx['patient'] as Map<String, dynamic>?;
-                                          final patientProfile = patient?['profiles'] as Map<String, dynamic>?;
-                                          final doctor = rx['doctor'] as Map<String, dynamic>?;
-                                          final doctorProfile = doctor;
-                                          final qrCodeId = patient?['qr_code_id'] as String?;
-                                          final created = DateTime.parse(rx['created_at'] as String);
-                                          final items = rx['prescription_items'] as List? ?? [];
-
-                                          return Container(
-                                            margin: const EdgeInsets.only(bottom: 10),
-                                            padding: const EdgeInsets.all(14),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius: BorderRadius.circular(16),
-                                              border: Border.all(color: const Color(0xFFE5E7EB)),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withValues(alpha: 0.015),
-                                                  blurRadius: 8,
-                                                  offset: const Offset(0, 2),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Text(
-                                                            patientProfile?['full_name'] as String? ?? 'Unknown Patient',
-                                                            style: GoogleFonts.plusJakartaSans(
-                                                              fontSize: 15,
-                                                              fontWeight: FontWeight.bold,
-                                                              color: const Color(0xFF1E293B),
-                                                            ),
-                                                          ),
-                                                          const SizedBox(height: 3),
-                                                          Text(
-                                                            'Dr. ${doctorProfile?['full_name'] ?? 'Unknown'} • ${DateFormat('MMM d, h:mm a').format(created)}',
-                                                            style: GoogleFonts.plusJakartaSans(
-                                                              fontSize: 11,
-                                                              color: const Color(0xFF64748B),
-                                                              fontWeight: FontWeight.w500,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    if (qrCodeId != null)
-                                                      ElevatedButton.icon(
-                                                        onPressed: () {
-                                                          context.push(RouteNames.pharmacistDispense, extra: qrCodeId);
-                                                        },
-                                                        icon: const Icon(Iconsax.tick_circle, size: 14),
-                                                        label: Text(
-                                                          'Dispense',
-                                                          style: GoogleFonts.plusJakartaSans(
-                                                            fontWeight: FontWeight.bold,
-                                                            fontSize: 11,
-                                                          ),
-                                                        ),
-                                                        style: ElevatedButton.styleFrom(
-                                                          backgroundColor: AppColors.pharmacist,
-                                                          foregroundColor: Colors.white,
-                                                          elevation: 0,
-                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                                          shape: RoundedRectangleBorder(
-                                                            borderRadius: BorderRadius.circular(10),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 10),
-                                                const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                                                const SizedBox(height: 10),
-                                                Wrap(
-                                                  runSpacing: 6,
-                                                  spacing: 6,
-                                                  children: items.map<Widget>((item) {
-                                                    return Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                        horizontal: 10,
-                                                        vertical: 6,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFFE6F4EA),
-                                                        borderRadius: BorderRadius.circular(8),
-                                                        border: Border.all(color: AppColors.pharmacist.withValues(alpha: 0.15)),
-                                                      ),
-                                                      child: Text(
-                                                        '${item['medicine_name']} (${item['dosage']})',
-                                                        style: GoogleFonts.plusJakartaSans(
-                                                          fontSize: 11,
-                                                          fontWeight: FontWeight.w600,
-                                                          color: const Color(0xFF0F766E),
-                                                        ),
-                                                      ),
-                                                    );
-                                                  }).toList(),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        }),
-                                      ],
+                                      children: filteredList.map((rx) {
+                                        return _buildPendingCard(context, rx);
+                                      }).toList(),
                                     ),
                                 ],
                               );
@@ -943,7 +764,7 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
               ),
             ),
           ),
-          // SCANNING LOADER OVERLAY
+          // SCANNING LOADER OVERLAY (dark by design)
           if (_isIdentifying)
             Container(
               color: Colors.black.withValues(alpha: 0.8),
@@ -962,11 +783,8 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          const Icon(
-                            Iconsax.frame_1,
-                            size: 80,
-                            color: Colors.white,
-                          ),
+                          const Icon(Iconsax.frame_1,
+                              size: 80, color: Colors.white),
                           AnimatedBuilder(
                             animation: _scannerController,
                             builder: (context, child) {
@@ -976,7 +794,7 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                                 right: 25,
                                 child: Container(
                                   height: 3,
-                                  color: Colors.redAccent,
+                                  color: t.accent,
                                 ),
                               );
                             },
@@ -989,7 +807,8 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
                     const SizedBox(height: 16),
                     Text(
                       _scanningStatus,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: const TextStyle(
+                        fontFamily: 'DM Sans',
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -1004,129 +823,239 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
     );
   }
 
+  Widget _sectionTitle(String text) {
+    final t = context.tokens;
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: t.textPrimary,
+        letterSpacing: -0.3,
+      ),
+    );
+  }
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required String value,
+    required String label,
+  }) {
+    final t = context.tokens;
+    return SquircleCard(
+      radius: AppSpacing.squircleGrouped,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: t.tint,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: t.accent, size: 18),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: t.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: t.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionCard({
-    required BuildContext context,
     required IconData icon,
     required String title,
     required String subtitle,
-    required Color color,
     required VoidCallback onTap,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.01),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
+    final t = context.tokens;
+    return SquircleCard(
+      radius: AppSpacing.squircleGrouped,
+      padding: const EdgeInsets.all(12),
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: t.tint,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: t.accent, size: 16),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: t.textPrimary,
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 16,
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: t.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        color: const Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingCard(BuildContext context, Map<String, dynamic> rx) {
+    final t = context.tokens;
+    final patient = rx['patient'] as Map<String, dynamic>?;
+    final patientProfile = patient?['profiles'] as Map<String, dynamic>?;
+    final doctor = rx['doctor'] as Map<String, dynamic>?;
+    final qrCodeId = patient?['qr_code_id'] as String?;
+    final created = DateTime.parse(rx['created_at'] as String);
+    final items = rx['prescription_items'] as List? ?? [];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SquircleCard(
+        radius: AppSpacing.squircleGrouped,
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        patientProfile?['full_name'] as String? ??
+                            'Unknown Patient',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: t.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Dr. ${doctor?['full_name'] ?? 'Unknown'} • ${DateFormat('MMM d, h:mm a').format(created)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: t.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (qrCodeId != null)
+                  FilledButton.icon(
+                    onPressed: () {
+                      context.push(RouteNames.pharmacistDispense,
+                          extra: qrCodeId);
+                    },
+                    icon: const Icon(Iconsax.tick_circle, size: 14),
+                    label: const Text('Dispense',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 11)),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Divider(height: 1, color: t.divider),
+            const SizedBox(height: 10),
+            Wrap(
+              runSpacing: 6,
+              spacing: 6,
+              children: items.map<Widget>((item) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: t.tint,
+                    borderRadius: BorderRadius.circular(8),
+                    border:
+                        Border.all(color: t.accent.withValues(alpha: 0.15)),
+                  ),
+                  child: Text(
+                    '${item['medicine_name']} (${item['dosage']})',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: t.accent,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    final t = context.tokens;
+    return SquircleCard(
+      radius: AppSpacing.squircleGrouped,
       padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF1F5F9),
+            decoration: BoxDecoration(
+              color: t.tint,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Iconsax.document_text,
-              size: 32,
-              color: Color(0xFF94A3B8),
-            ),
+            child: Icon(Iconsax.document_text, size: 32, color: t.accent),
           ),
           const SizedBox(height: 16),
           Text(
             'No pending prescriptions',
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF1E293B),
+              fontWeight: FontWeight.w700,
+              color: t.textPrimary,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             'Scan patient QR or search manually to dispense',
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              color: const Color(0xFF64748B),
-              height: 1.4,
-            ),
+            style: TextStyle(fontSize: 12, color: t.textSecondary, height: 1.4),
           ),
         ],
       ),
@@ -1134,6 +1063,7 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
   }
 
   Widget _buildFilterChip(String label, int count) {
+    final t = context.tokens;
     final isSelected = _selectedFilter == label;
     return InkWell(
       onTap: () {
@@ -1145,36 +1075,37 @@ class _PharmacistDashboardScreenState extends ConsumerState<PharmacistDashboardS
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.pharmacist : const Color(0xFFF3F4F6),
+          color: isSelected ? t.accent : t.card,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppColors.pharmacist : const Color(0xFFE5E7EB),
-          ),
+          border: Border.all(color: isSelected ? t.accent : t.divider),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
-                color: isSelected ? Colors.white : const Color(0xFF6B7280),
+              style: TextStyle(
+                color: isSelected ? t.accentOn : t.textSecondary,
                 fontSize: 12,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(width: 4),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white24 : const Color(0xFFE5E7EB),
+                color: isSelected
+                    ? t.accentOn.withValues(alpha: 0.25)
+                    : t.divider,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 count.toString(),
-                style: GoogleFonts.plusJakartaSans(
-                  color: isSelected ? Colors.white : const Color(0xFF4B5563),
+                style: TextStyle(
+                  color: isSelected ? t.accentOn : t.textSecondary,
                   fontSize: 10,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),

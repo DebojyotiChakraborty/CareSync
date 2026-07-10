@@ -111,13 +111,43 @@ class KYCService {
       // --- OPTION A: BIOMETRIC 1:1 FACE MATCHING GATE REMOVED (Bypassed per request) ---
 
       // Call secure submit RPC instead of direct client-side update/upsert of kyc_status
-      await _supabase.rpc('submit_kyc_secure', params: {
-        'p_full_name': fullName,
-        'p_date_of_birth': dateOfBirth.toIso8601String().split('T')[0],
-        'p_id_document_url': idDocumentUrl,
-        'p_selfie_url': selfieUrl,
-        'p_additional_documents': additionalDocuments ?? [],
-      });
+      try {
+        await _supabase.rpc('submit_kyc_secure', params: {
+          'p_full_name': fullName,
+          'p_date_of_birth': dateOfBirth.toIso8601String().split('T')[0],
+          'p_id_document_url': idDocumentUrl,
+          'p_selfie_url': selfieUrl,
+          'p_additional_documents': additionalDocuments ?? [],
+        });
+      } on PostgrestException catch (e) {
+        // Migration 039 (submit_kyc_secure) may not be applied to this
+        // environment yet. PostgREST reports a missing function as PGRST202
+        // ("Could not find the function ... in the schema cache"). In that case
+        // fall back to a direct upsert that records the submission as PENDING.
+        //
+        // SECURITY: the client must NEVER write kyc_status:'verified' itself —
+        // that would let any user self-approve KYC and defeat the identity gate.
+        // Verification is a trusted server-side decision (the submit_kyc_secure
+        // RPC). The fallback only stores the submitted documents as 'pending'.
+        final missingFn = e.code == 'PGRST202' ||
+            e.message.contains('submit_kyc_secure');
+        if (!missingFn) rethrow;
+
+        debugPrint(
+            '[KYC] submit_kyc_secure RPC unavailable; storing submission as '
+            "pending. Apply migration 039 so KYC can be verified server-side.");
+
+        await _supabase.from('kyc_verifications').upsert({
+          'user_id': userId,
+          'full_name': fullName,
+          'date_of_birth': dateOfBirth.toIso8601String().split('T')[0],
+          'id_document_url': idDocumentUrl,
+          'selfie_url': selfieUrl,
+          'additional_documents': additionalDocuments ?? [],
+          'kyc_status': 'pending',
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'user_id');
+      }
 
       // Ensure the patient record exists in the 'patients' table
       try {

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax/iconsax.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/design/cs_buttons.dart';
+import '../../../../core/design/linear_fade_appbar.dart';
+import '../../../../core/design/squircle_card.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../services/two_factor_service.dart';
+import 'package:caresync/core/design/squircle_input_border.dart';
 
 class TwoFactorVerificationScreen extends ConsumerStatefulWidget {
   final String userId;
@@ -46,6 +51,16 @@ class _TwoFactorVerificationScreenState
     super.dispose();
   }
 
+  void _snack(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor:
+            error ? context.tokens.error : context.tokens.accent,
+      ),
+    );
+  }
+
   Future<void> _sendCode() async {
     setState(() => _isLoading = true);
 
@@ -66,27 +81,14 @@ class _TwoFactorVerificationScreenState
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Verification code sent to ${widget.codeType == TwoFactorCodeType.email ? 'email' : 'phone'}',
-            ),
-            backgroundColor: AppColors.success,
-          ),
+        _snack(
+          'Verification code sent to ${widget.codeType == TwoFactorCodeType.email ? 'email' : 'phone'}',
         );
-
         // Start countdown
         _startResendCountdown();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send code: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      if (mounted) _snack('Failed to send code: $e', error: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -118,24 +120,11 @@ class _TwoFactorVerificationScreenState
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification code resent'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-
+        _snack('Verification code resent');
         _startResendCountdown();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to resend code: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      if (mounted) _snack('Failed to resend code: $e', error: true);
     } finally {
       if (mounted) setState(() => _isResending = false);
     }
@@ -144,12 +133,7 @@ class _TwoFactorVerificationScreenState
   Future<void> _verifyCode() async {
     final code = _codeController.text.trim();
     if (code.isEmpty || code.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid 6-digit code'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      _snack('Please enter a valid 6-digit code', error: true);
       return;
     }
 
@@ -163,25 +147,12 @@ class _TwoFactorVerificationScreenState
       );
 
       if (verified && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification successful'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-
+        _snack('Verification successful');
         // Call the onVerified callback
         widget.onVerified();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      if (mounted) _snack(e.toString(), error: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -189,33 +160,29 @@ class _TwoFactorVerificationScreenState
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     final isEmail = widget.codeType == TwoFactorCodeType.email;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Two-Factor Authentication'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
+    return CSScaffold(
+      title: 'Verification',
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(AppSpacing.pageMargin),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const SizedBox(height: AppSpacing.md),
             // Icon
             Icon(
-              isEmail ? Icons.email : Icons.phone,
-              size: 80,
-              color: AppColors.primary,
+              isEmail ? Iconsax.sms : Iconsax.call,
+              size: 72,
+              color: t.accent,
             ),
             const SizedBox(height: AppSpacing.lg),
 
             // Title
             Text(
               'Verify Your Identity',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -223,9 +190,10 @@ class _TwoFactorVerificationScreenState
             // Subtitle
             Text(
               'We sent a 6-digit code to ${isEmail ? widget.email : widget.phoneNumber}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey.shade600,
-                  ),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: t.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -236,29 +204,21 @@ class _TwoFactorVerificationScreenState
               keyboardType: TextInputType.number,
               maxLength: 6,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              cursorColor: t.accent,
+              style: TextStyle(
                 fontSize: 32,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w900,
                 letterSpacing: 8,
+                color: t.textPrimary,
               ),
               decoration: InputDecoration(
                 hintText: '000000',
                 counterText: '',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.cardBorder, width: 1.0),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.cardBorder, width: 1.0),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 1.5,
-                  ),
-                ),
+                filled: true,
+                fillColor: t.card,
+                border: SquircleInputBorder(),
+                enabledBorder: SquircleInputBorder(),
+                focusedBorder: SquircleInputBorder(),
               ),
               onChanged: (value) {
                 if (value.length == 6) {
@@ -269,32 +229,10 @@ class _TwoFactorVerificationScreenState
             const SizedBox(height: AppSpacing.xl),
 
             // Verify Button
-            ElevatedButton(
-              onPressed: _isLoading ? null : _verifyCode,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text(
-                      'Verify Code',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+            CSPrimaryButton(
+              label: 'Verify Code',
+              loading: _isLoading,
+              onPressed: _verifyCode,
             ),
             const SizedBox(height: AppSpacing.md),
 
@@ -304,15 +242,15 @@ class _TwoFactorVerificationScreenState
               children: [
                 Text(
                   "Didn't receive the code?",
-                  style: TextStyle(color: Colors.grey.shade600),
+                  style: TextStyle(color: t.textSecondary),
                 ),
                 const SizedBox(width: 4),
                 if (_resendCountdown > 0)
                   Text(
                     'Resend in ${_resendCountdown}s',
                     style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontWeight: FontWeight.bold,
+                      color: t.textSecondary.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w700,
                     ),
                   )
                 else
@@ -331,32 +269,22 @@ class _TwoFactorVerificationScreenState
             const SizedBox(height: AppSpacing.lg),
 
             // Help Text
-            Container(
+            SquircleCard(
+              radius: AppSpacing.squircleGrouped,
               padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.15),
-                ),
-              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                      ),
+                      Icon(Iconsax.info_circle, size: 20, color: t.textSecondary),
                       const SizedBox(width: 8),
                       Text(
                         'Security Tips',
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w700,
                           fontSize: 14,
-                          color: Theme.of(context).colorScheme.onSurface,
+                          color: t.textPrimary,
                         ),
                       ),
                     ],
@@ -367,10 +295,7 @@ class _TwoFactorVerificationScreenState
                     '• CareSync will never ask for your code\n'
                     '• Code expires in 10 minutes\n'
                     '• Maximum 3 attempts allowed',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
+                    style: TextStyle(fontSize: 12, color: t.textSecondary),
                   ),
                 ],
               ),

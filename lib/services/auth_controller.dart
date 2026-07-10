@@ -83,7 +83,11 @@ class AuthController {
   /// Note: This helper explicitly excludes revoked device checks because
   /// revoked devices are handled in the caller (lines 63-67) with an exception
   bool _needsBiometricSetup(Map<String, dynamic>? device) {
-    return false;
+    // Revoked devices are handled by the caller; here a missing record or a
+    // record that has not yet enabled biometrics means setup is still required.
+    if (device == null) return true;
+    if (device['revoked'] == true) return false;
+    return device['biometric_enabled'] != true;
   }
 
   /// Trigger biometric setup if required - COMPLETE FLOW per spec
@@ -358,7 +362,37 @@ class AuthController {
   /// 2. Backend device record has biometric_enabled = true
   /// 3. Device is NOT revoked
   Future<bool> isBiometricAlreadyEnabled(String userId) async {
-    return false;
+    // 1. Secure storage must contain a restorable session.
+    final accessToken = await _storage.getAccessToken();
+    final refreshToken = await _storage.getRefreshToken();
+    if (accessToken == null || refreshToken == null) return false;
+
+    // 2. Local enrollment flag is the primary source of truth for whether the
+    //    user opted into biometric unlock on this device.
+    final localEnabled = await _storage.isBiometricEnabled();
+    if (!localEnabled) return false;
+
+    // 3. Confirm against the backend device record when reachable; a revoked
+    //    device or one that no longer has biometrics enabled disables unlock.
+    try {
+      final deviceId = await _storage.getDeviceId();
+      if (deviceId == null) return true; // honor local flag
+
+      final device = await _supabase
+          .from('registered_devices')
+          .select('biometric_enabled, revoked')
+          .eq('user_id', userId)
+          .eq('device_id', deviceId)
+          .maybeSingle();
+
+      if (device == null) return true; // trust local flag
+      if (device['revoked'] == true) return false;
+      return device['biometric_enabled'] == true;
+    } catch (e) {
+      _log('[AUTH] isBiometricAlreadyEnabled backend check failed: $e');
+      // Fail closed: if the user enrolled biometrics locally, still require them.
+      return true;
+    }
   }
 
   /// Helper method to log with [AUTH] prefix as required

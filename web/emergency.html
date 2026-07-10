@@ -377,6 +377,17 @@
       document.getElementById('error-message').textContent = message;
     }
 
+    // SECURITY: escape patient-controlled values before building innerHTML to prevent XSS.
+    function escapeHtml(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function displayData(data) {
       const patient = data.patient || {};
       const conditions = data.conditions || [];
@@ -394,10 +405,10 @@
       // Conditions
       if (conditions.length > 0) {
         const conditionsHtml = conditions.map(c => `
-          <div class="condition-card ${c.type || ''}">
-            <span class="condition-type">${(c.type || 'OTHER').toUpperCase()}</span>
-            ${c.severity ? `<span class="severity ${c.severity}">${c.severity}</span>` : ''}
-            <p class="condition-desc">${c.description}</p>
+          <div class="condition-card ${escapeHtml(c.type || '')}">
+            <span class="condition-type">${escapeHtml((c.type || 'OTHER').toUpperCase())}</span>
+            ${c.severity ? `<span class="severity ${escapeHtml(c.severity)}">${escapeHtml(c.severity)}</span>` : ''}
+            <p class="condition-desc">${escapeHtml(c.description)}</p>
           </div>
         `).join('');
         document.getElementById('conditions-list').innerHTML = conditionsHtml;
@@ -407,8 +418,8 @@
       if (medications.length > 0) {
         const medsHtml = medications.map(m => `
           <div class="medication-card">
-            <div class="med-name">${m.medicine}</div>
-            <div class="med-details">${m.dosage} • ${m.frequency}</div>
+            <div class="med-name">${escapeHtml(m.medicine)}</div>
+            <div class="med-details">${escapeHtml(m.dosage)} • ${escapeHtml(m.frequency)}</div>
           </div>
         `).join('');
         document.getElementById('medications-list').innerHTML = medsHtml;

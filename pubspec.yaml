@@ -46,8 +46,6 @@ dependencies:
   image_picker: ^1.1.2
   crypto: ^3.0.3
 
-  # Environment variables
-  flutter_dotenv: ^5.2.1
   http: ^1.3.0
 
   # Form handling
@@ -67,13 +65,6 @@ dependencies:
   image: ^4.5.4
   camera: ^0.12.0+1
 
-  # Wearables Integration
-  health: any
-  workmanager: ^0.9.0+3
-  sqflite: ^2.3.0
-  path: ^1.9.0
-  oauth2: ^2.0.2
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -86,12 +77,32 @@ dev_dependencies:
   json_serializable: ^6.8.0
   riverpod_generator: ^2.6.2
 
+# App launcher icon generation (run: dart run flutter_launcher_icons)
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/app-icon.png"
+  remove_alpha_ios: true
+  background_color_ios: "#FFFFFF"
+  adaptive_icon_background: "#FFFFFF"
+  # Inset variant: adaptive icons only display the central safe zone, so a
+  # full-bleed foreground gets cropped (launcher icon + Android 12 splash).
+  adaptive_icon_foreground: "assets/images/app-icon-foreground.png"
+  min_sdk_android: 21
+
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
     - assets/icons/
-    - assets/Splash_Screen.png
-    - assets/logo_foreground.png
-    - .env
+
+  fonts:
+    - family: DM Sans
+      fonts:
+        - asset: assets/fonts/DMSans-Variable.ttf
+    - family: DM Mono
+      fonts:
+        - asset: assets/fonts/DMMono-Regular.ttf
+        - asset: assets/fonts/DMMono-Medium.ttf
+          weight: 500
