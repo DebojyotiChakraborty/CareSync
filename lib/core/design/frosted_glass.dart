@@ -30,7 +30,12 @@ class FrostedSquircle extends StatelessWidget {
       clipper: ShapeBorderClipper(shape: SquircleBorder(radius: radius)),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: Container(color: base, child: child),
+        // Transparent Material so sheet content (ListTile, InkWell, …) always
+        // has a Material ancestor without altering the frosted appearance.
+        child: Container(
+          color: base,
+          child: Material(type: MaterialType.transparency, child: child),
+        ),
       ),
     );
   }
