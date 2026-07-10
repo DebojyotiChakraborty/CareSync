@@ -7,15 +7,36 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
+import 'package:iconsax/iconsax.dart';
 import 'package:uuid/uuid.dart';
+import 'package:caresync/core/design/cs_buttons.dart';
+import 'package:caresync/core/design/minimal_sheet_dialog.dart';
 import 'package:caresync/core/theme/app_colors.dart';
 import 'package:caresync/services/custom_biometric_service.dart';
 import 'package:caresync/services/kyc_service.dart';
 import 'package:caresync/features/shared/utils/image_quality_validator.dart';
+
+/// DM Sans text style for the dark immersive scan HUD (bundled font, no fetch).
+TextStyle _scan({
+  double? fontSize,
+  FontWeight? fontWeight,
+  Color? color,
+  double? letterSpacing,
+  double? height,
+  List<Shadow>? shadows,
+}) =>
+    TextStyle(
+      fontFamily: 'DM Sans',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: letterSpacing,
+      height: height,
+      shadows: shadows,
+    );
 
 class EnrollmentStep {
   final String id;
@@ -501,44 +522,25 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
   }
 
   void _showUploadFailedDialog(File file) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text(
-          'Upload Failed',
-          style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'A connection issue occurred during upload. Would you like to retry uploading this photo or discard it and retake?',
-          style: GoogleFonts.plusJakartaSans(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              _retakePose();          // Discard and retake
+    showAppSheet<void>(
+      context,
+      builder: (ctx) => AppSheetContent(
+        icon: Iconsax.cloud_cross,
+        title: 'Upload Failed',
+        message:
+            'A connection issue occurred during upload. Would you like to retry uploading this photo or discard it and retake?',
+        children: [
+          CSTwoButtonRow(
+            cancelLabel: 'Retake',
+            confirmLabel: 'Retry Upload',
+            onCancel: () {
+              Navigator.of(ctx).pop(); // Close sheet
+              _retakePose(); // Discard and retake
             },
-            child: Text(
-              'RETAKE',
-              style: GoogleFonts.plusJakartaSans(color: const Color(0xFFEF4444)),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
+            onConfirm: () {
+              Navigator.of(ctx).pop(); // Close sheet
               _uploadAndValidateCapturedImage(); // Retry same image
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: Text(
-              'RETRY UPLOAD',
-              style: GoogleFonts.plusJakartaSans(color: Colors.white),
-            ),
           ),
         ],
       ),
@@ -605,9 +607,9 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
   }
 
   Color get _circleColor {
-    if (_validationError != null) return const Color(0xFFEF4444); // Vibrant Red
-    if (_isPoseAccepted) return const Color(0xFF10B981); // Vibrant Emerald Green
-    return _poseEligible ? const Color(0xFF10B981) : const Color(0xFF3B82F6); // Tech Blue
+    if (_validationError != null) return AppColors.errorDarkMode; // Vibrant Red
+    if (_isPoseAccepted) return AppColors.accentColor; // Vibrant Emerald Green
+    return _poseEligible ? AppColors.accentColor : AppColors.accentColor; // Tech Blue
   }
 
 
@@ -616,7 +618,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
     final step = _steps[_currentStepIndex];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D), // Ink Black
+      backgroundColor: Colors.black, // Ink Black
       body: SafeArea(
         child: Stack(
           fit: StackFit.expand,
@@ -669,14 +671,14 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(2),
                             color: isCompleted
-                                ? const Color(0xFF10B981)
+                                ? AppColors.accentColor
                                 : isActive
-                                    ? const Color(0xFF3B82F6)
+                                    ? AppColors.accentColor
                                     : Colors.white24,
                             boxShadow: isActive
                                 ? [
                                     BoxShadow(
-                                      color: const Color(0xFF3B82F6).withOpacity(0.5),
+                                      color: AppColors.accentColor.withValues(alpha: 0.5),
                                       blurRadius: 4,
                                       spreadRadius: 1,
                                     )
@@ -707,7 +709,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                       ),
                       Text(
                         'BIOMETRIC VERIFICATION',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: _scan(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -723,8 +725,8 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                         ),
                         child: Text(
                           'STEP ${_currentStepIndex + 1}/${_steps.length}',
-                          style: GoogleFonts.plusJakartaSans(
-                            color: Colors.white.withOpacity(0.8),
+                          style: _scan(
+                            color: Colors.white.withValues(alpha: 0.8),
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -750,9 +752,9 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
+                          color: Colors.black.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -762,7 +764,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                               height: 8,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: _poseEligible ? AppColors.success : AppColors.warning,
+                                color: _poseEligible ? AppColors.accentColor : Colors.white54,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -770,7 +772,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                               _poseEligible
                                   ? 'READY TO CAPTURE (${_currentPoseConfidence.toStringAsFixed(0)}% FIT)'
                                   : 'ALIGNING FACE (${_currentPoseConfidence.toStringAsFixed(0)}% FIT)',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: _scan(
                                 color: Colors.white,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -801,7 +803,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
+                            color: Colors.black.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: Colors.white12),
                           ),
@@ -813,14 +815,14 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                 height: 24,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2.5,
-                                  color: Color(0xFF3B82F6),
+                                  color: AppColors.accentColor,
                                 ),
                               ),
                               const SizedBox(height: 12),
                               Text(
                                 'ANALYZING QUALITY',
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: const Color(0xFF3B82F6),
+                                style: _scan(
+                                  color: AppColors.accentColor,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.2,
@@ -839,17 +841,17 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
+                            color: Colors.black.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: AppColors.error.withOpacity(0.2)),
+                            border: Border.all(color: AppColors.errorDarkMode.withValues(alpha: 0.2)),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 'VALIDATION FAILED',
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: AppColors.error,
+                                style: _scan(
+                                  color: AppColors.errorDarkMode,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.2,
@@ -859,7 +861,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                               Text(
                                 _validationError!,
                                 textAlign: TextAlign.center,
-                                style: GoogleFonts.plusJakartaSans(
+                                style: _scan(
                                   color: Colors.white70,
                                   fontSize: 13,
                                   height: 1.4,
@@ -871,7 +873,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                 child: ElevatedButton(
                                   onPressed: _retakePose,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.error,
+                                    backgroundColor: AppColors.errorDarkMode,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     shape: RoundedRectangleBorder(
@@ -881,7 +883,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                   ),
                                   child: Text(
                                     'RETAKE PHOTO',
-                                    style: GoogleFonts.plusJakartaSans(
+                                    style: _scan(
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -900,7 +902,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
+                            color: Colors.black.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: Colors.white12),
                           ),
@@ -909,7 +911,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                             children: [
                               Text(
                                 'IMAGE CAPTURED',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: _scan(
                                   color: Colors.white,
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -920,7 +922,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                               Text(
                                 'Verify that your face is clear and matches the pose instruction.',
                                 textAlign: TextAlign.center,
-                                style: GoogleFonts.plusJakartaSans(
+                                style: _scan(
                                   color: Colors.white70,
                                   fontSize: 12,
                                 ),
@@ -933,7 +935,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                       onPressed: _retakePose,
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: Colors.white,
-                                        side: BorderSide(color: Colors.white.withOpacity(0.15)),
+                                        side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
                                         padding: const EdgeInsets.symmetric(vertical: 12),
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(12),
@@ -941,7 +943,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                       ),
                                       child: Text(
                                         'RETAKE',
-                                        style: GoogleFonts.plusJakartaSans(
+                                        style: _scan(
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -952,7 +954,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                     child: ElevatedButton(
                                       onPressed: _uploadAndValidateCapturedImage,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF3B82F6),
+                                        backgroundColor: AppColors.accentColor,
                                         foregroundColor: Colors.white,
                                         padding: const EdgeInsets.symmetric(vertical: 12),
                                         shape: RoundedRectangleBorder(
@@ -962,7 +964,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                       ),
                                       child: Text(
                                         'LOOKS GOOD',
-                                        style: GoogleFonts.plusJakartaSans(
+                                        style: _scan(
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -983,17 +985,17 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
+                            color: Colors.black.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: AppColors.success.withOpacity(0.2)),
+                            border: Border.all(color: AppColors.accentColor.withValues(alpha: 0.2)),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 'VALIDATION PASSED',
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: AppColors.success,
+                                style: _scan(
+                                  color: AppColors.accentColor,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.2,
@@ -1003,7 +1005,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                               Text(
                                 'Pose matched and image quality accepted.',
                                 textAlign: TextAlign.center,
-                                style: GoogleFonts.plusJakartaSans(
+                                style: _scan(
                                   color: Colors.white70,
                                   fontSize: 12,
                                 ),
@@ -1016,7 +1018,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                       onPressed: _retakePose,
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: Colors.white,
-                                        side: BorderSide(color: Colors.white.withOpacity(0.15)),
+                                        side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
                                         padding: const EdgeInsets.symmetric(vertical: 12),
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(12),
@@ -1024,7 +1026,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                       ),
                                       child: Text(
                                         'RETAKE',
-                                        style: GoogleFonts.plusJakartaSans(
+                                        style: _scan(
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -1035,7 +1037,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                     child: ElevatedButton(
                                       onPressed: _acceptPose,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.success,
+                                        backgroundColor: AppColors.accentColor,
                                         foregroundColor: Colors.white,
                                         padding: const EdgeInsets.symmetric(vertical: 12),
                                         shape: RoundedRectangleBorder(
@@ -1045,7 +1047,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                       ),
                                       child: Text(
                                         'CONTINUE',
-                                        style: GoogleFonts.plusJakartaSans(
+                                        style: _scan(
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -1068,19 +1070,19 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF3B82F6).withOpacity(0.15),
+                              color: AppColors.accentColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
+                              border: Border.all(color: AppColors.accentColor.withValues(alpha: 0.3)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(step.icon, color: const Color(0xFF3B82F6), size: 14),
+                                Icon(step.icon, color: AppColors.accentColor, size: 14),
                                 const SizedBox(width: 6),
                                 Text(
                                   step.title.toUpperCase(),
-                                  style: GoogleFonts.plusJakartaSans(
-                                    color: const Color(0xFF3B82F6),
+                                  style: _scan(
+                                    color: AppColors.accentColor,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1.2,
@@ -1093,7 +1095,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                           Text(
                             _liveInstruction,
                             textAlign: TextAlign.center,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: _scan(
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -1101,7 +1103,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                               shadows: [
                                 Shadow(
                                   blurRadius: 4.0,
-                                  color: Colors.black.withOpacity(0.5),
+                                  color: Colors.black.withValues(alpha: 0.5),
                                   offset: const Offset(0, 2),
                                 ),
                               ],
@@ -1131,7 +1133,7 @@ class _PremiumFaceScanScreenState extends State<PremiumFaceScanScreen>
                                     duration: const Duration(milliseconds: 200),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: _poseEligible ? AppColors.success : Colors.white.withOpacity(0.15),
+                                      color: _poseEligible ? AppColors.accentColor : Colors.white.withValues(alpha: 0.15),
                                     ),
                                     child: Center(
                                       child: Icon(
@@ -1190,7 +1192,7 @@ class FaceGuidePainter extends CustomPainter {
 
     // 2. Draw animated pulsing guide ring (outer glow)
     final ringPaint = Paint()
-      ..color = circleColor.withOpacity(0.12)
+      ..color = circleColor.withValues(alpha: 0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     canvas.drawCircle(center, radius * pulseFactor, ringPaint);
@@ -1204,7 +1206,7 @@ class FaceGuidePainter extends CustomPainter {
 
     // Draw high-precision radial ticks around the target circle
     final tickPaint = Paint()
-      ..color = circleColor.withOpacity(0.25)
+      ..color = circleColor.withValues(alpha: 0.25)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
     final double tickStartRadius = radius + 3;
@@ -1228,14 +1230,14 @@ class FaceGuidePainter extends CustomPainter {
     
     // Draw the background progress track
     final trackPaint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
+      ..color = Colors.white.withValues(alpha: 0.08)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawCircle(center, radius + 11, trackPaint);
 
     final progressPaint = Paint()
       ..shader = const SweepGradient(
-        colors: [Color(0xFF3B82F6), Color(0xFF10B981)], // Tech Blue to Emerald Green
+        colors: [AppColors.accentColor, AppColors.accentColor], // Tech Blue to Emerald Green
         stops: [0.0, 1.0],
         transform: GradientRotation(-math.pi / 2),
       ).createShader(outerRect)
@@ -1261,7 +1263,7 @@ class FaceGuidePainter extends CustomPainter {
       ..strokeWidth = 3.5;
 
     final arrowPaint2 = Paint()
-      ..color = circleColor.withOpacity(0.4)
+      ..color = circleColor.withValues(alpha: 0.4)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 2.5;
