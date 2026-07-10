@@ -123,16 +123,19 @@ class KYCService {
         // Migration 039 (submit_kyc_secure) may not be applied to this
         // environment yet. PostgREST reports a missing function as PGRST202
         // ("Could not find the function ... in the schema cache"). In that case
-        // fall back to a direct upsert — RLS (migrations 008/021) still permits
-        // the owner to write their own row. Once 039 is applied, the RPC path
-        // is used and this fallback never triggers.
+        // fall back to a direct upsert that records the submission as PENDING.
+        //
+        // SECURITY: the client must NEVER write kyc_status:'verified' itself —
+        // that would let any user self-approve KYC and defeat the identity gate.
+        // Verification is a trusted server-side decision (the submit_kyc_secure
+        // RPC). The fallback only stores the submitted documents as 'pending'.
         final missingFn = e.code == 'PGRST202' ||
             e.message.contains('submit_kyc_secure');
         if (!missingFn) rethrow;
 
         debugPrint(
-            '[KYC] submit_kyc_secure RPC unavailable, falling back to direct upsert. '
-            'Apply migration 039 to the database.');
+            '[KYC] submit_kyc_secure RPC unavailable; storing submission as '
+            "pending. Apply migration 039 so KYC can be verified server-side.");
 
         await _supabase.from('kyc_verifications').upsert({
           'user_id': userId,
@@ -141,7 +144,7 @@ class KYCService {
           'id_document_url': idDocumentUrl,
           'selfie_url': selfieUrl,
           'additional_documents': additionalDocuments ?? [],
-          'kyc_status': 'verified',
+          'kyc_status': 'pending',
           'updated_at': DateTime.now().toIso8601String(),
         }, onConflict: 'user_id');
       }

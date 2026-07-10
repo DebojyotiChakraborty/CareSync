@@ -98,19 +98,38 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       // Enforce role-specific paths
-      if (isAuthenticated && profile != null) {
+      if (isAuthenticated) {
         final path = state.matchedLocation;
-        final expectedPrefix = _rolePrefix(profile.role);
         final isCommonRoute = path == RouteNames.profile ||
             path == RouteNames.notifications ||
             path == RouteNames.biometricEnrollment ||
             path == RouteNames.kycVerification ||
             path == RouteNames.deviceManagement;
 
-        if (!isCommonRoute &&
-            expectedPrefix != null &&
-            !path.startsWith(expectedPrefix)) {
-          return _getDashboardRoute(profile);
+        // Any route scoped to a specific role must be guarded.
+        final isRoleScoped = path.startsWith('/patient') ||
+            path.startsWith('/doctor') ||
+            path.startsWith('/pharmacist');
+
+        if (!isCommonRoute && isRoleScoped) {
+          if (profile == null) {
+            // Still loading / just-invalidated: hold on splash until the role
+            // is known, closing the cross-role access window during the race.
+            if (profileAsync.isLoading) {
+              return RouteNames.splash;
+            }
+            // Loaded but no profile (missing row / fetch error): deny the
+            // role-scoped route and fall back to a neutral screen instead of
+            // looping on splash.
+            return RouteNames.roleSelection;
+          }
+
+          final expectedPrefix = _rolePrefix(profile.role);
+          // Unknown/unrecognized role or wrong prefix: deny and send the user
+          // back to their own dashboard (never default-allow).
+          if (expectedPrefix == null || !path.startsWith(expectedPrefix)) {
+            return _getDashboardRoute(profile);
+          }
         }
       }
 
