@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:iconsax/iconsax.dart';
+import '../../../../core/design/minimal_sheet_dialog.dart';
+import '../../../../core/design/squircle_card.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../providers/vitals_provider.dart';
 import '../../models/vital.dart';
 import 'add_vital_bottom_sheet.dart';
@@ -12,92 +15,71 @@ class VitalsSummaryCard extends ConsumerWidget {
   const VitalsSummaryCard({super.key});
 
   void _showVitalOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    showAppSheet<void>(
+      context,
       builder: (context) => const AddVitalBottomSheet(),
     );
   }
 
+  // Maps a status key to a token colour.
+  Color _statusColor(BuildContext context, String status) {
+    final t = context.tokens;
+    switch (status) {
+      case 'good':
+        return t.accent;
+      case 'warn':
+        return t.error;
+      default:
+        return t.textSecondary;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.tokens;
     final vitalsAsync = ref.watch(patientVitalsProvider);
     return vitalsAsync.when(
       data: (vitalsList) {
-        // 1. Heart Rate
         final hrLatest = _getLatest(vitalsList, 'heart_rate');
-        final hrPrev = _getPrevious(vitalsList, 'heart_rate');
-        final hrTrend = _calculateStatus(hrLatest, hrPrev, 'bpm');
+        final hrTrend = _calculateStatus(hrLatest, 'bpm');
 
-        // 2. Blood Pressure
         final bpLatest = _getLatest(vitalsList, 'blood_pressure');
-        final bpPrev = _getPrevious(vitalsList, 'blood_pressure');
-        final bpTrend = _calculateStatus(bpLatest, bpPrev, 'mmHg');
+        final bpTrend = _calculateStatus(bpLatest, 'mmHg');
 
-        // 3. Weight
         final weightLatest = _getLatest(vitalsList, 'weight');
         final weightPrev = _getPrevious(vitalsList, 'weight');
         final weightTrend = _calculateWeightTrend(weightLatest, weightPrev);
 
-        // Derive current display value from the latest manually-logged vital
-        final String hrVal;
-        if (hrLatest?.value != null) {
-          String val = hrLatest!.value;
+        String decrypt(Vital? v) {
+          if (v?.value == null) return 'No data logged yet.';
           try {
-            val = EncryptionService.instance.decryptDeterministic(
-              encryptedData: hrLatest.value,
-              patientId: hrLatest.patientId,
+            return EncryptionService.instance.decryptDeterministic(
+              encryptedData: v!.value,
+              patientId: v.patientId,
             );
-          } catch (_) {}
-          hrVal = val;
-        } else {
-          hrVal = 'No data logged yet.';
+          } catch (_) {
+            return v!.value;
+          }
         }
+
+        final hrVal = decrypt(hrLatest);
+        final bpVal = decrypt(bpLatest);
+        final weightVal = decrypt(weightLatest);
+
         final hrLabel =
             hrLatest != null ? (hrTrend['text'] as String) : 'No Data';
-        final hrColor = hrLatest != null
-            ? (hrTrend['color'] as Color)
-            : AppColors.textSub;
-
-        final String bpVal;
-        if (bpLatest?.value != null) {
-          String val = bpLatest!.value;
-          try {
-            val = EncryptionService.instance.decryptDeterministic(
-              encryptedData: bpLatest.value,
-              patientId: bpLatest.patientId,
-            );
-          } catch (_) {}
-          bpVal = val;
-        } else {
-          bpVal = 'No data logged yet.';
-        }
         final bpLabel =
             bpLatest != null ? (bpTrend['text'] as String) : 'No Data';
-        final bpColor = bpLatest != null
-            ? (bpTrend['color'] as Color)
-            : AppColors.textSub;
-
-        final String weightVal;
-        if (weightLatest?.value != null) {
-          String val = weightLatest!.value;
-          try {
-            val = EncryptionService.instance.decryptDeterministic(
-              encryptedData: weightLatest.value,
-              patientId: weightLatest.patientId,
-            );
-          } catch (_) {}
-          weightVal = val;
-        } else {
-          weightVal = 'No data logged yet.';
-        }
         final weightLabel = weightLatest != null
             ? (weightTrend['text'] as String)
             : 'No Data';
-        final weightColor = weightLatest != null
-            ? (weightTrend['color'] as Color)
-            : AppColors.textSub;
+
+        final hrColor = _statusColor(
+            context, hrLatest != null ? hrTrend['status'] as String : 'neutral');
+        final bpColor = _statusColor(
+            context, bpLatest != null ? bpTrend['status'] as String : 'neutral');
+        final weightColor = _statusColor(context,
+            weightLatest != null ? weightTrend['status'] as String : 'neutral');
 
         final bool showNoDataNotice = hrVal == 'No data logged yet.' ||
             bpVal == 'No data logged yet.' ||
@@ -110,11 +92,7 @@ class VitalsSummaryCard extends ConsumerWidget {
               children: [
                 _buildVitalCard(
                   context,
-                  iconWidget: const Icon(
-                    Icons.favorite_rounded,
-                    size: 14,
-                    color: Color(0xFFF472B6),
-                  ),
+                  icon: Iconsax.heart,
                   value: hrVal,
                   unit: 'bpm',
                   label: 'Heart Rate',
@@ -125,11 +103,7 @@ class VitalsSummaryCard extends ConsumerWidget {
                 const SizedBox(width: 12),
                 _buildVitalCard(
                   context,
-                  iconWidget: const Icon(
-                    Icons.water_drop_rounded,
-                    size: 14,
-                    color: Color(0xFF60A5FA),
-                  ),
+                  icon: Iconsax.drop,
                   value: bpVal,
                   unit: 'mmHg',
                   label: 'Blood Pressure',
@@ -140,11 +114,7 @@ class VitalsSummaryCard extends ConsumerWidget {
                 const SizedBox(width: 12),
                 _buildVitalCard(
                   context,
-                  iconWidget: const Icon(
-                    Icons.monitor_weight_outlined,
-                    size: 14,
-                    color: Color(0xFF34D399),
-                  ),
+                  icon: Iconsax.weight,
                   value: weightVal,
                   unit: 'kg',
                   label: 'Weight',
@@ -156,28 +126,21 @@ class VitalsSummaryCard extends ConsumerWidget {
             ),
             if (showNoDataNotice) ...[
               const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
+              SquircleCard(
+                radius: AppSpacing.squircleGrouped,
+                borderSide: BorderSide(color: t.divider),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.info_outline_rounded,
-                      size: 16,
-                      color: Color(0xFF64748B),
-                    ),
+                    Icon(Iconsax.info_circle, size: 16, color: t.textSecondary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Tap a card to log your vitals manually.',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: const Color(0xFF64748B),
+                          color: t.textSecondary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -189,23 +152,22 @@ class VitalsSummaryCard extends ConsumerWidget {
           ],
         );
       },
-      loading:
-          () => Row(
-            children: [
-              Expanded(child: LoadingSkeleton(height: 100, radius: 20)),
-              const SizedBox(width: 12),
-              Expanded(child: LoadingSkeleton(height: 100, radius: 20)),
-              const SizedBox(width: 12),
-              Expanded(child: LoadingSkeleton(height: 100, radius: 20)),
-            ],
-          ),
+      loading: () => const Row(
+        children: [
+          Expanded(child: LoadingSkeleton(height: 100, radius: 20)),
+          SizedBox(width: 12),
+          Expanded(child: LoadingSkeleton(height: 100, radius: 20)),
+          SizedBox(width: 12),
+          Expanded(child: LoadingSkeleton(height: 100, radius: 20)),
+        ],
+      ),
       error: (err, _) => const SizedBox.shrink(),
     );
   }
 
   Widget _buildVitalCard(
     BuildContext context, {
-    required Widget iconWidget,
+    required IconData icon,
     required String value,
     required String unit,
     required String label,
@@ -213,92 +175,85 @@ class VitalsSummaryCard extends ConsumerWidget {
     required Color trendColor,
     required VoidCallback onTap,
   }) {
+    final t = context.tokens;
     final bool isNoData = value == 'No data logged yet.';
     final String displayValue = isNoData ? '--' : value;
     final String displayUnit = isNoData ? '' : unit;
 
     return Expanded(
-      child: GestureDetector(
+      child: SquircleCard(
+        radius: AppSpacing.squircleGrouped,
+        borderSide: BorderSide(color: t.divider),
+        padding: const EdgeInsets.all(14),
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Row: Icon + Label
-              Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 14, color: t.accent),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: t.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
                 children: [
-                  iconWidget,
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF64748B),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  Text(
+                    displayValue,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: t.textPrimary,
+                      letterSpacing: -0.5,
                     ),
                   ),
+                  if (displayUnit.isNotEmpty) ...[
+                    const SizedBox(width: 2),
+                    Text(
+                      displayUnit,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: t.textSecondary,
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              // Value and Unit Row
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      displayValue,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF121212),
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    if (displayUnit.isNotEmpty) ...[
-                      const SizedBox(width: 2),
-                      Text(
-                        displayUnit,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: trendColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                trend,
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: trendColor,
                 ),
               ),
-              const SizedBox(height: 10),
-              // Minimal Status Pill
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: trendColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  trend,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    color: trendColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -318,28 +273,20 @@ class VitalsSummaryCard extends ConsumerWidget {
     return filtered[1];
   }
 
-  Map<String, dynamic> _calculateStatus(
-    Vital? latest,
-    Vital? prev,
-    String unit,
-  ) {
-    if (latest == null)
-      return {'text': 'No record', 'color': AppColors.textSub};
+  Map<String, dynamic> _calculateStatus(Vital? latest, String unit) {
+    if (latest == null) return {'text': 'No record', 'status': 'neutral'};
 
     final val = latest.value;
     if (unit == 'bpm') {
       try {
         final rate = int.parse(val);
         if (rate >= 60 && rate <= 100) {
-          return {'text': 'Normal', 'color': AppColors.trendSuccess};
+          return {'text': 'Normal', 'status': 'good'};
         } else {
-          return {
-            'text': rate < 60 ? 'Low' : 'High',
-            'color': AppColors.trendWarning,
-          };
+          return {'text': rate < 60 ? 'Low' : 'High', 'status': 'warn'};
         }
       } catch (_) {
-        return {'text': 'Logged', 'color': AppColors.trendSuccess};
+        return {'text': 'Logged', 'status': 'good'};
       }
     }
 
@@ -349,39 +296,38 @@ class VitalsSummaryCard extends ConsumerWidget {
         final sys = int.parse(parts[0]);
         final dia = int.parse(parts[1]);
         if (sys < 120 && dia < 80) {
-          return {'text': 'Optimal', 'color': AppColors.trendSuccess};
+          return {'text': 'Optimal', 'status': 'good'};
         } else if (sys <= 129 && dia < 80) {
-          return {'text': 'Normal', 'color': AppColors.trendSuccess};
+          return {'text': 'Normal', 'status': 'good'};
         } else {
-          return {'text': 'Elevated', 'color': AppColors.trendWarning};
+          return {'text': 'Elevated', 'status': 'warn'};
         }
       } catch (_) {
-        return {'text': 'Logged', 'color': AppColors.trendSuccess};
+        return {'text': 'Logged', 'status': 'good'};
       }
     }
 
-    return {'text': 'Stable', 'color': AppColors.textSub};
+    return {'text': 'Stable', 'status': 'neutral'};
   }
 
   Map<String, dynamic> _calculateWeightTrend(Vital? latest, Vital? prev) {
-    if (latest == null)
-      return {'text': 'No record', 'color': AppColors.textSub};
-    if (prev == null) return {'text': 'Stable', 'color': AppColors.textSub};
+    if (latest == null) return {'text': 'No record', 'status': 'neutral'};
+    if (prev == null) return {'text': 'Stable', 'status': 'neutral'};
 
     try {
       final curW = double.parse(latest.value);
       final preW = double.parse(prev.value);
       final diff = curW - preW;
       if (diff.abs() < 0.1) {
-        return {'text': 'Stable', 'color': AppColors.textSub};
+        return {'text': 'Stable', 'status': 'neutral'};
       }
       final direction = diff > 0 ? '+' : '';
       return {
         'text': '$direction${diff.toStringAsFixed(1)} kg',
-        'color': diff > 0 ? AppColors.trendWarning : AppColors.trendSuccess,
+        'status': diff > 0 ? 'warn' : 'good',
       };
     } catch (_) {
-      return {'text': 'Stable', 'color': AppColors.textSub};
+      return {'text': 'Stable', 'status': 'neutral'};
     }
   }
 }

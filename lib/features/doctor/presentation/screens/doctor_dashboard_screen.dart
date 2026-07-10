@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/design/squircle_card.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../routing/route_names.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../auth/providers/auth_provider.dart';
@@ -22,7 +24,8 @@ final doctorTotalStatsProvider = FutureProvider<int>((ref) async {
 });
 
 // Provider for recent activity (last 3 days)
-final recentActivityProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final recentActivityProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   return await SupabaseService.instance.getDoctorRecentPrescriptions();
 });
 
@@ -30,24 +33,16 @@ class DoctorDashboardScreen extends ConsumerStatefulWidget {
   const DoctorDashboardScreen({super.key});
 
   @override
-  ConsumerState<DoctorDashboardScreen> createState() => _DoctorDashboardScreenState();
+  ConsumerState<DoctorDashboardScreen> createState() =>
+      _DoctorDashboardScreenState();
 }
 
 class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
   bool _isOnDuty = true;
 
-  // Premium design colors matching Patient Dashboard
-  static const Color kBgColor = Color(0xFFFAFAFA);
-  static const Color kSurfaceColor = Colors.white;
-  static const Color kPrimaryColor = Color(0xFF0284C7); // Clinical Blue
-  static const Color kSuccessColor = Color(0xFF16A34A);
-  static const Color kWarningColor = Color(0xFFD97706);
-  static const Color kTextPrimary = Color(0xFF111827); // Charcoal
-  static const Color kTextSecondary = Color(0xFF6B7280); // Neutral grey
-  static const Color kBorderColor = Color(0xFFE5E7EB); // Soft grey border
-
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     final profile = ref.watch(currentProfileProvider);
     final todayStats = ref.watch(doctorTodayStatsProvider);
     final totalStats = ref.watch(doctorTotalStatsProvider);
@@ -58,7 +53,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
     final displayName = profile.valueOrNull?.fullName ?? 'Physician';
 
     return Scaffold(
-      backgroundColor: kBgColor,
+      backgroundColor: t.scaffold,
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(doctorTodayStatsProvider);
@@ -66,16 +61,17 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
           ref.invalidate(recentActivityProvider);
           ref.invalidate(appointmentsProvider);
         },
-        color: kPrimaryColor,
+        color: t.accent,
         child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics()),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── 1. LIGHT HERO HEADER ─────────────────────────────────────────
+              // ── 1. HERO HEADER ───────────────────────────────────────────
               Container(
                 width: double.infinity,
-                color: Colors.white,
+                color: t.card,
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
@@ -87,12 +83,14 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                           onTap: () => context.push(RouteNames.profile),
                           child: CircleAvatar(
                             radius: 22,
-                            backgroundColor: kPrimaryColor.withOpacity(0.08),
+                            backgroundColor: t.tint,
                             child: Text(
-                              displayName.isNotEmpty ? displayName[0].toUpperCase() : 'D',
-                              style: GoogleFonts.plusJakartaSans(
-                                color: kPrimaryColor,
-                                fontWeight: FontWeight.bold,
+                              displayName.isNotEmpty
+                                  ? displayName[0].toUpperCase()
+                                  : 'D',
+                              style: TextStyle(
+                                color: t.accent,
+                                fontWeight: FontWeight.w700,
                                 fontSize: 16,
                               ),
                             ),
@@ -108,22 +106,26 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                                 children: [
                                   Text(
                                     'Good Morning,',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      color: kTextSecondary,
+                                    style: TextStyle(
+                                      color: t.textSecondary,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   GestureDetector(
-                                    onTap: () => setState(() => _isOnDuty = !_isOnDuty),
+                                    onTap: () =>
+                                        setState(() => _isOnDuty = !_isOnDuty),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: Colors.white,
+                                        color: t.card,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: _isOnDuty ? kSuccessColor : kTextSecondary,
+                                          color: _isOnDuty
+                                              ? t.accent
+                                              : t.textSecondary,
                                           width: 1,
                                         ),
                                       ),
@@ -135,16 +137,20 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                                             height: 5,
                                             decoration: BoxDecoration(
                                               shape: BoxShape.circle,
-                                              color: _isOnDuty ? kSuccessColor : kTextSecondary,
+                                              color: _isOnDuty
+                                                  ? t.accent
+                                                  : t.textSecondary,
                                             ),
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
                                             _isOnDuty ? 'On Duty' : 'Away',
-                                            style: GoogleFonts.plusJakartaSans(
-                                              color: _isOnDuty ? kSuccessColor : kTextSecondary,
+                                            style: TextStyle(
+                                              color: _isOnDuty
+                                                  ? t.accent
+                                                  : t.textSecondary,
                                               fontSize: 9,
-                                              fontWeight: FontWeight.bold,
+                                              fontWeight: FontWeight.w700,
                                             ),
                                           ),
                                         ],
@@ -155,18 +161,20 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                displayName.startsWith('Dr.') ? displayName : 'Dr. $displayName',
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: kTextPrimary,
+                                displayName.startsWith('Dr.')
+                                    ? displayName
+                                    : 'Dr. $displayName',
+                                style: TextStyle(
+                                  color: t.textPrimary,
                                   fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w700,
                                   letterSpacing: -0.4,
                                 ),
                               ),
                               Text(
                                 'Cardiology Department • St. Mary\'s',
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: kTextSecondary,
+                                style: TextStyle(
+                                  color: t.textSecondary,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -174,24 +182,21 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                             ],
                           ),
                         ),
-                        Row(
-                          children: [
-                            _buildHeaderIcon(Iconsax.notification, () => context.push(RouteNames.notifications)),
-                          ],
-                        ),
+                        _buildHeaderIcon(Iconsax.notification,
+                            () => context.push(RouteNames.notifications)),
                       ],
                     ),
                   ),
                 ),
               ),
 
-              // ── MAIN CONTENT BODY ───────────────────────────────────────────
+              // ── MAIN CONTENT BODY ───────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── 2. METRICS GRID (2X2) ──────────────────────────────────
+                    // ── 2. METRICS GRID (2X2) ──────────────────────────────
                     GridView.count(
                       padding: EdgeInsets.zero,
                       shrinkWrap: true,
@@ -205,35 +210,31 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                           title: 'Today\'s Rx',
                           value: todayStats.valueOrNull?.toString() ?? '0',
                           icon: Iconsax.document_text,
-                          color: kPrimaryColor,
                           trend: 'Refreshed just now',
                         ),
                         _buildMetricCard(
                           title: 'Total Patients',
                           value: totalStats.valueOrNull?.toString() ?? '0',
                           icon: Iconsax.people,
-                          color: kPrimaryColor,
                           trend: 'All-time active',
                         ),
                         _buildMetricCard(
                           title: 'In Clinic',
                           value: '3',
                           icon: Iconsax.location,
-                          color: kSuccessColor,
                           trend: 'Awaiting consult',
                         ),
                         _buildMetricCard(
                           title: 'Pending Reports',
                           value: '2',
                           icon: Iconsax.receipt_2,
-                          color: kWarningColor,
                           trend: 'Requires review',
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
 
-                    // ── 3. QUICK ACTIONS GRID (2X2) ────────────────────────────
+                    // ── 3. QUICK ACTIONS GRID (2X2) ────────────────────────
                     _sectionLabel('Quick Actions'),
                     const SizedBox(height: 8),
                     GridView.count(
@@ -249,61 +250,61 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                           title: 'New Rx',
                           subtitle: 'Issue Prescription',
                           icon: Iconsax.add_circle,
-                          color: kPrimaryColor,
-                          onTap: () => context.push(RouteNames.doctorPatientLookup),
+                          onTap: () =>
+                              context.push(RouteNames.doctorPatientLookup),
                         ),
                         _buildActionCard(
                           title: 'Find Patient',
                           subtitle: 'Lookup Records',
                           icon: Iconsax.personalcard,
-                          color: kPrimaryColor,
-                          onTap: () => context.push(RouteNames.doctorPatientLookup),
+                          onTap: () =>
+                              context.push(RouteNames.doctorPatientLookup),
                         ),
                         _buildActionCard(
                           title: 'Availability',
                           subtitle: 'Clinic Timeslots',
                           icon: Iconsax.calendar_1,
-                          color: kPrimaryColor,
                           onTap: () => context.push('/doctor/availability'),
                         ),
                         _buildActionCard(
                           title: 'History Logs',
                           subtitle: 'Signed Records',
                           icon: Iconsax.clock,
-                          color: kPrimaryColor,
                           onTap: () => context.push(RouteNames.doctorHistory),
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
 
-                    // ── 4. TODAY'S SCHEDULE ────────────────────────────────────
+                    // ── 4. TODAY'S SCHEDULE ────────────────────────────────
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         _sectionLabel('Today\'s Schedule'),
                         Text(
                           todayDate,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: kTextSecondary,
+                            color: t.textSecondary,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     appointmentsAsync.when(
-                      loading: () => const Center(
+                      loading: () => Center(
                         child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryColor),
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: t.accent),
                         ),
                       ),
                       error: (err, _) => Center(
                         child: Text(
                           'Error loading schedule: $err',
-                          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 13),
+                          style:
+                              TextStyle(color: t.textSecondary, fontSize: 13),
                         ),
                       ),
                       data: (list) {
@@ -311,8 +312,8 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                         final todayAppointments = list.where((app) {
                           final appDate = app.startTime;
                           return appDate.year == now.year &&
-                                 appDate.month == now.month &&
-                                 appDate.day == now.day;
+                              appDate.month == now.month &&
+                              appDate.day == now.day;
                         }).toList();
 
                         return _buildScheduleContainer(todayAppointments);
@@ -320,7 +321,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                     ),
                     const SizedBox(height: 18),
 
-                    // ── 5. RECENT ACTIVITY ─────────────────────────────────────
+                    // ── 5. RECENT ACTIVITY ─────────────────────────────────
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -329,10 +330,10 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                           onTap: () => context.push(RouteNames.doctorHistory),
                           child: Text(
                             'View All',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: TextStyle(
                               fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: kPrimaryColor,
+                              fontWeight: FontWeight.w700,
+                              color: t.accent,
                             ),
                           ),
                         ),
@@ -340,16 +341,18 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                     ),
                     const SizedBox(height: 8),
                     recentActivity.when(
-                      loading: () => const Center(
+                      loading: () => Center(
                         child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryColor),
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: t.accent),
                         ),
                       ),
                       error: (err, _) => Center(
                         child: Text(
                           'Error loading activity: $err',
-                          style: GoogleFonts.plusJakartaSans(color: kTextSecondary, fontSize: 13),
+                          style:
+                              TextStyle(color: t.textSecondary, fontSize: 13),
                         ),
                       ),
                       data: (data) {
@@ -358,71 +361,74 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                         }
                         return Column(
                           children: data.take(3).map((rx) {
-                            final patient = rx['patient'] as Map<String, dynamic>?;
-                            final profiles = patient?['profiles'] as Map<String, dynamic>?;
-                            final patientName = profiles?['full_name'] as String? ?? 'Unknown Patient';
-                            final diagnosis = rx['diagnosis'] as String? ?? 'No diagnosis';
+                            final patient =
+                                rx['patient'] as Map<String, dynamic>?;
+                            final profiles =
+                                patient?['profiles'] as Map<String, dynamic>?;
+                            final patientName =
+                                profiles?['full_name'] as String? ??
+                                    'Unknown Patient';
+                            final diagnosis =
+                                rx['diagnosis'] as String? ?? 'No diagnosis';
                             final date = DateTime.parse(rx['created_at']);
-                            final formattedDate = DateFormat('MMM d, h:mm a').format(date);
+                            final formattedDate =
+                                DateFormat('MMM d, h:mm a').format(date);
 
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: kSurfaceColor,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: kBorderColor, width: 1),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.015),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                                leading: CircleAvatar(
-                                  radius: 16,
-                                  backgroundColor: const Color(0xFFF1F5F9),
-                                  child: Text(
-                                    patientName.isNotEmpty ? patientName[0].toUpperCase() : 'P',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      color: kTextSecondary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-                                title: Text(
-                                  patientName,
-                                  style: GoogleFonts.plusJakartaSans(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: kTextPrimary),
-                                ),
-                                subtitle: Text(
-                                  '$diagnosis • $formattedDate',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    color: kTextSecondary,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                trailing: const Icon(
-                                  Icons.arrow_forward_ios_rounded,
-                                  color: Color(0xFF94A3B8),
-                                  size: 12,
-                                ),
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: SquircleCard(
+                                radius: AppSpacing.squircleGrouped,
+                                borderSide: BorderSide(color: t.divider),
+                                padding: EdgeInsets.zero,
                                 onTap: () {
                                   context.push(
                                     RouteNames.doctorPatientRecord,
                                     extra: {
-                                      'patientId': patient?['id'] as String? ?? '',
+                                      'patientId':
+                                          patient?['id'] as String? ?? '',
                                       'patientName': patientName,
                                     },
                                   );
                                 },
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 2),
+                                  leading: CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: t.tint,
+                                    child: Text(
+                                      patientName.isNotEmpty
+                                          ? patientName[0].toUpperCase()
+                                          : 'P',
+                                      style: TextStyle(
+                                        color: t.accent,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    patientName,
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                        color: t.textPrimary),
+                                  ),
+                                  subtitle: Text(
+                                    '$diagnosis • $formattedDate',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: t.textSecondary,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  trailing: Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    color: t.textSecondary,
+                                    size: 12,
+                                  ),
+                                ),
                               ),
                             );
                           }).toList(),
@@ -441,6 +447,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
   }
 
   Widget _buildHeaderIcon(IconData icon, VoidCallback onTap) {
+    final t = context.tokens;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -450,23 +457,24 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: t.card,
             shape: BoxShape.circle,
-            border: Border.all(color: kBorderColor),
+            border: Border.all(color: t.divider),
           ),
-          child: Icon(icon, color: const Color(0xFF374151), size: 18),
+          child: Icon(icon, color: t.textPrimary, size: 18),
         ),
       ),
     );
   }
 
   Widget _sectionLabel(String text) {
+    final t = context.tokens;
     return Text(
       text,
-      style: GoogleFonts.plusJakartaSans(
+      style: TextStyle(
         fontSize: 14,
-        fontWeight: FontWeight.bold,
-        color: kTextPrimary,
+        fontWeight: FontWeight.w700,
+        color: t.textPrimary,
         letterSpacing: -0.2,
       ),
     );
@@ -476,23 +484,13 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
     required String title,
     required String value,
     required IconData icon,
-    required Color color,
     required String trend,
   }) {
-    return Container(
+    final t = context.tokens;
+    return SquircleCard(
+      radius: AppSpacing.squircleGrouped,
+      borderSide: BorderSide(color: t.divider),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.015),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -502,14 +500,14 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
             children: [
               Text(
                 title.toUpperCase(),
-                style: GoogleFonts.plusJakartaSans(
-                  color: const Color(0xFF94A3B8),
+                style: t.monoMeta.copyWith(
+                  color: t.textSecondary,
                   fontSize: 8.5,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
                 ),
               ),
-              Icon(icon, color: kTextSecondary, size: 14),
+              Icon(icon, color: t.textSecondary, size: 14),
             ],
           ),
           Row(
@@ -518,10 +516,10 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
             children: [
               Text(
                 value,
-                style: GoogleFonts.plusJakartaSans(
-                  color: kTextPrimary,
+                style: TextStyle(
+                  color: t.textPrimary,
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(width: 6),
@@ -530,8 +528,8 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   trend,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: const Color(0xFF94A3B8),
+                  style: TextStyle(
+                    color: t.textSecondary,
                     fontSize: 8,
                     fontWeight: FontWeight.w500,
                   ),
@@ -548,100 +546,70 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
     required String title,
     required String subtitle,
     required IconData icon,
-    required Color color,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    final t = context.tokens;
+    return SquircleCard(
+      radius: AppSpacing.squircleGrouped,
+      borderSide: BorderSide(color: t.divider),
+      padding: const EdgeInsets.all(12),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kBorderColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.015),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: kTextPrimary,
-                    ),
+      child: Row(
+        children: [
+          Icon(icon, color: t.accent, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: t.textPrimary,
                   ),
-                  const SizedBox(height: 1),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 9.5,
-                      color: kTextSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    color: t.textSecondary,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildEmptySchedule() {
-    return Container(
-      width: double.infinity,
+    final t = context.tokens;
+    return SquircleCard(
+      radius: AppSpacing.squircleGrouped,
+      borderSide: BorderSide(color: t.divider),
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      decoration: BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.015),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
       child: Column(
         children: [
-          const Icon(
-            Iconsax.calendar_1,
-            size: 28,
-            color: Color(0xFF94A3B8),
-          ),
+          Icon(Iconsax.calendar_1, size: 28, color: t.textSecondary),
           const SizedBox(height: 8),
           Text(
             'No appointments today',
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: kTextPrimary,
+              fontWeight: FontWeight.w700,
+              color: t.textPrimary,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             'Your calendar is clear. Enjoy your day!',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10.5,
-              color: kTextSecondary,
-            ),
+            style: TextStyle(fontSize: 10.5, color: t.textSecondary),
           ),
         ],
       ),
@@ -649,24 +617,15 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
   }
 
   Widget _buildScheduleContainer(List<Appointment> appointments) {
+    final t = context.tokens;
     if (appointments.isEmpty) {
       return _buildEmptySchedule();
     }
 
-    return Container(
+    return SquircleCard(
+      radius: AppSpacing.squircleGrouped,
+      borderSide: BorderSide(color: t.divider),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.015),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
       child: Column(
         children: appointments.map((app) {
           final isCompleted = app.status == 'completed';
@@ -675,19 +634,21 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
           Color statusColor;
           String statusText;
           if (isCompleted) {
-            statusColor = const Color(0xFF64748B);
+            statusColor = t.textSecondary;
             statusText = 'Completed';
           } else if (isCancelled) {
-            statusColor = const Color(0xFFEF4444);
+            statusColor = t.error;
             statusText = 'Cancelled';
           } else {
-            statusColor = const Color(0xFF0284C7);
+            statusColor = t.accent;
             statusText = 'Scheduled';
           }
 
           final timeFormatted = DateFormat('hh:mm a').format(app.startTime);
           final patientName = app.patient?.fullName ?? 'Unknown Patient';
-          final reason = app.notes != null && app.notes!.isNotEmpty ? app.notes! : 'Consultation';
+          final reason = app.notes != null && app.notes!.isNotEmpty
+              ? app.notes!
+              : 'Consultation';
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -697,10 +658,10 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   width: 70,
                   child: Text(
                     timeFormatted,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: kTextSecondary,
+                      fontWeight: FontWeight.w700,
+                      color: t.textSecondary,
                     ),
                   ),
                 ),
@@ -719,19 +680,19 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                     children: [
                       Text(
                         patientName,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: kTextPrimary,
+                          fontWeight: FontWeight.w700,
+                          color: t.textPrimary,
                         ),
                       ),
                       Text(
                         reason,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: TextStyle(
                           fontSize: 10.5,
-                          color: kTextSecondary,
+                          color: t.textSecondary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -739,17 +700,18 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: statusColor.withValues(alpha: 0.1),
                     border: Border.all(color: statusColor, width: 1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     statusText,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: t.monoMeta.copyWith(
                       fontSize: 8.5,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
                       color: statusColor,
                     ),
                   ),
@@ -763,38 +725,25 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
   }
 
   Widget _buildEmptyActivity() {
-    return Container(
-      width: double.infinity,
+    final t = context.tokens;
+    return SquircleCard(
+      radius: AppSpacing.squircleGrouped,
+      borderSide: BorderSide(color: t.divider),
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      decoration: BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.015),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
       child: Column(
         children: [
           Text(
             'No recent patient activity',
-            style: GoogleFonts.plusJakartaSans(
+            style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: kTextPrimary,
+              fontWeight: FontWeight.w700,
+              color: t.textPrimary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             'Issued patient records will appear in your clinical list.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10.5,
-              color: kTextSecondary,
-            ),
+            style: TextStyle(fontSize: 10.5, color: t.textSecondary),
           ),
         ],
       ),
