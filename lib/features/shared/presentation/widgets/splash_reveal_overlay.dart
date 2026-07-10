@@ -33,7 +33,7 @@ class _SplashRevealOverlayState extends ConsumerState<SplashRevealOverlay>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 850),
+      duration: const Duration(milliseconds: 600),
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed) {
           setState(() => _done = true);
