@@ -21,6 +21,10 @@ import '../../../patient/models/patient_data.dart';
 
 // Imports for parity
 import '../../../patient/models/prescription_input_models.dart';
+<<<<<<< Updated upstream
+=======
+import 'prescription_history_screen.dart';
+>>>>>>> Stashed changes
 
 class NewPrescriptionScreen extends ConsumerStatefulWidget {
   final String patientId;
@@ -408,6 +412,10 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
       );
 
       if (mounted) {
+        ref.invalidate(doctorPatientPrescriptionsProvider(widget.patientId));
+        ref.invalidate(doctorPrescriptionsProvider(widget.patientId));
+        ref.invalidate(doctorPrescriptionsProvider(null));
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Prescription Signed, PDF Generated & Issued'),
@@ -517,9 +525,8 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
             label: 'Sign & Issue Prescription',
             loading: _isLoading,
             onPressed: () {
-              ref.read(currentProfileProvider).whenData((profile) {
-                _submit(profile);
-              });
+              final profile = ref.read(currentProfileProvider).valueOrNull;
+              _submit(profile);
             },
           ),
         ),
@@ -680,29 +687,43 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
                     const SizedBox(height: 24),
 
                     Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14),
                       decoration: _cardDecoration,
-                      child: SwitchListTile.adaptive(
-                        title: Text(
-                          'Emergency Access',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: t.textPrimary,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Emergency Access',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                    color: t.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Allow first responders to view via QR code scan',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: t.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        subtitle: Text(
-                          'Allow first responders to view via QR code scan',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: t.textSecondary,
+                          const SizedBox(width: 16),
+                          Switch.adaptive(
+                            value: _isPublic,
+                            onChanged: (v) => setState(() => _isPublic = v),
+                            activeThumbColor: t.accent,
+                            activeTrackColor: t.accent.withValues(alpha: 0.3),
                           ),
-                        ),
-                        value: _isPublic,
-                        onChanged: (v) => setState(() => _isPublic = v),
-                        activeTrackColor: t.accent,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 8),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 100),
@@ -728,7 +749,7 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
   BoxDecoration get _cardDecoration => BoxDecoration(
         color: context.tokens.card,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.tokens.divider, width: 1.0),
+        border: Border.all(color: context.tokens.divider.withValues(alpha: 0.5), width: 1.0),
       );
 
   InputDecoration _inputDecoration(
@@ -737,10 +758,14 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
-          color: t.textSecondary, fontSize: 13, fontWeight: FontWeight.w500),
+          color: t.textSecondary.withValues(alpha: 0.8),
+          fontSize: 12,
+          fontWeight: FontWeight.w600),
       hintText: hint,
-      hintStyle: TextStyle(color: t.textSecondary, fontSize: 13),
+      hintStyle: TextStyle(
+          color: t.textSecondary.withValues(alpha: 0.5), fontSize: 13),
       filled: true,
+<<<<<<< Updated upstream
       fillColor: t.scaffold,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
@@ -754,6 +779,21 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: t.accent, width: 1.5),
+=======
+      fillColor: t.card,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: t.divider.withValues(alpha: 0.8)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: t.divider.withValues(alpha: 0.6)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: t.accent.withValues(alpha: 0.6), width: 1.5),
+>>>>>>> Stashed changes
       ),
       suffixIcon: suffix,
       isDense: true,
@@ -859,16 +899,21 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
   Widget _buildPatientInfoBar() {
     final t = context.tokens;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: _cardDecoration,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: t.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: t.divider.withValues(alpha: 0.5), width: 1.0),
+      ),
       child: Row(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
+              shape: BoxShape.circle,
               color: t.tint,
-              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: t.accent.withValues(alpha: 0.15), width: 1.5),
             ),
             child: Center(
               child: Text(
@@ -876,14 +921,14 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
                     ? widget.patientName[0].toUpperCase()
                     : 'P',
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
                   color: t.accent,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -891,40 +936,21 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
                 Text(
                   widget.patientName,
                   style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                     color: t.textPrimary,
+                    letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      'ID: ${widget.patientId.substring(0, 8).toUpperCase()}',
-                      style: t.monoMeta.copyWith(
-                        fontSize: 11,
-                        color: t.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: t.scaffold,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Patient',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: t.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 2),
+                Text(
+                  'RECORD ID • ${widget.patientId.substring(0, 8).toUpperCase()}',
+                  style: TextStyle(
+                    color: t.textSecondary.withValues(alpha: 0.7),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ],
             ),
@@ -984,41 +1010,46 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
 
   Widget _buildEmptyState() {
     final t = context.tokens;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 36.0),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: t.scaffold,
-                shape: BoxShape.circle,
-                border: Border.all(color: t.divider),
-              ),
-              child: Icon(Iconsax.document_text_1,
-                  size: 32, color: t.textSecondary),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 36.0),
+      decoration: BoxDecoration(
+        color: t.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.divider.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: t.scaffold.withValues(alpha: 0.5),
+              shape: BoxShape.circle,
+              border: Border.all(color: t.divider.withValues(alpha: 0.5)),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'No Medications Added Yet',
-              style: TextStyle(
-                color: t.textPrimary,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
+            child: Icon(Iconsax.document_text_1,
+                size: 24, color: t.textSecondary),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'No Medications Added Yet',
+            style: TextStyle(
+              color: t.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Tap "+ Add Drug" to append items to this prescription.',
-              style: TextStyle(
-                color: t.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tap "+ Add Drug" to append items to this prescription.',
+            style: TextStyle(
+              color: t.textSecondary.withValues(alpha: 0.8),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1051,30 +1082,30 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
       children: [
         Text(label,
             style: TextStyle(
-                fontSize: 12,
-                color: t.textSecondary,
-                fontWeight: FontWeight.w500)),
+                fontSize: 11,
+                color: t.textSecondary.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: t.scaffold,
-              borderRadius: BorderRadius.circular(8),
+              color: t.card,
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
                   color: isAlert
                       ? t.error.withValues(alpha: 0.5)
-                      : t.divider),
+                      : t.divider.withValues(alpha: 0.6)),
             ),
             child: Row(
               children: [
                 Text(
                   DateFormat('dd MMM yyyy').format(date),
                   style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                       color: t.textPrimary),
                 ),
                 const Spacer(),
@@ -1127,9 +1158,10 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
         const SizedBox(width: 12),
         Container(
           height: 32,
+          padding: const EdgeInsets.all(2),
           decoration: BoxDecoration(
-            color: t.scaffold,
-            borderRadius: BorderRadius.circular(8),
+            color: t.scaffold.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1145,9 +1177,8 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
 
   Widget _buildSegmentBtn(String label, bool isSelected, VoidCallback onTap) {
     final t = context.tokens;
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         alignment: Alignment.center,
@@ -1177,24 +1208,16 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
               children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: t.accent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 10),
                 Text(
-                  'Drug #${index + 1}',
+                  'MEDICATION ENTRY #${index + 1}'.toUpperCase(),
                   style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: t.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 10,
+                    color: t.accent,
+                    letterSpacing: 0.8,
                   ),
                 ),
                 const Spacer(),
@@ -1374,27 +1397,46 @@ class _NewPrescriptionScreenState extends ConsumerState<NewPrescriptionScreen> {
 
   Widget _buildMiniChip(_MedicationEntry med, String label) {
     final t = context.tokens;
-    return InkWell(
+    final bool isSelected = label.contains('-')
+        ? med.frequencyController.text.trim() == label.trim()
+        : med.instructionsController.text.trim().toLowerCase() == label.trim().toLowerCase();
+
+    return GestureDetector(
       onTap: () {
-        if (label.contains('-')) {
-          med.frequencyController.text = label;
-        } else {
-          med.instructionsController.text = label;
-        }
+        setState(() {
+          if (label.contains('-')) {
+            if (med.frequencyController.text.trim() == label.trim()) {
+              med.frequencyController.clear();
+            } else {
+              med.frequencyController.text = label;
+            }
+          } else {
+            final currentText = med.instructionsController.text.trim().toLowerCase();
+            final targetText = label.trim().toLowerCase();
+            if (currentText == targetText) {
+              med.instructionsController.clear();
+            } else {
+              med.instructionsController.text = label;
+            }
+          }
+        });
       },
-      borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: t.scaffold,
+          color: isSelected ? t.accent : t.scaffold,
           borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? t.accent : t.divider.withValues(alpha: 0.5),
+            width: 1,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 10,
-            color: t.textSecondary,
+            color: isSelected ? t.accentOn : t.textSecondary,
             fontWeight: FontWeight.w700,
           ),
         ),

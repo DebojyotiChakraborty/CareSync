@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
@@ -15,6 +16,32 @@ import '../../../shared/models/appointment.dart';
 
 // Provider for today's count
 final doctorTodayStatsProvider = FutureProvider<int>((ref) async {
+  final doctorId = SupabaseService.instance.currentUserId;
+  if (doctorId == null) return 0;
+
+  final channel = SupabaseService.instance.client
+      .channel('doctor_rx_stats_$doctorId')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'prescriptions',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'doctor_id',
+          value: doctorId,
+        ),
+        callback: (payload) {
+          ref.invalidateSelf();
+          ref.invalidate(doctorTotalStatsProvider);
+          ref.invalidate(recentActivityProvider);
+        },
+      );
+
+  channel.subscribe();
+  ref.onDispose(() {
+    SupabaseService.instance.client.removeChannel(channel);
+  });
+
   return await SupabaseService.instance.getTodaysPrescriptionCount();
 });
 
@@ -592,24 +619,49 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
     final t = context.tokens;
     return SquircleCard(
       radius: AppSpacing.squircleGrouped,
+<<<<<<< Updated upstream
       borderSide: BorderSide(color: t.divider),
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       child: Column(
+=======
+      padding: const EdgeInsets.all(16),
+      child: Row(
+>>>>>>> Stashed changes
         children: [
-          Icon(Iconsax.calendar_1, size: 28, color: t.textSecondary),
-          const SizedBox(height: 8),
-          Text(
-            'No appointments today',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: t.textPrimary,
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: t.accent.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
             ),
+            child: Icon(Iconsax.calendar_1, size: 20, color: t.accent),
           ),
-          const SizedBox(height: 2),
-          Text(
-            'Your calendar is clear. Enjoy your day!',
-            style: TextStyle(fontSize: 10.5, color: t.textSecondary),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'No Appointments Today',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: t.textPrimary,
+                    letterSpacing: -0.15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Your schedule is clear. Enjoy your day!',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: t.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -624,10 +676,15 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
 
     return SquircleCard(
       radius: AppSpacing.squircleGrouped,
+<<<<<<< Updated upstream
       borderSide: BorderSide(color: t.divider),
       padding: const EdgeInsets.all(16),
+=======
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+>>>>>>> Stashed changes
       child: Column(
-        children: appointments.map((app) {
+        children: List.generate(appointments.length, (index) {
+          final app = appointments[index];
           final isCompleted = app.status == 'completed';
           final isCancelled = app.status == 'cancelled';
 
@@ -644,36 +701,68 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
             statusText = 'Scheduled';
           }
 
-          final timeFormatted = DateFormat('hh:mm a').format(app.startTime);
+          final rawTime = DateFormat('hh:mm a').format(app.startTime);
+          final timeParts = rawTime.split(' ');
+          final timeStr = timeParts[0];
+          final amPmStr = timeParts.length > 1 ? timeParts[1].toLowerCase() : '';
+
           final patientName = app.patient?.fullName ?? 'Unknown Patient';
           final reason = app.notes != null && app.notes!.isNotEmpty
               ? app.notes!
               : 'Consultation';
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              border: index < appointments.length - 1
+                  ? Border(bottom: BorderSide(color: t.divider.withValues(alpha: 0.4), width: 0.5))
+                  : null,
+            ),
             child: Row(
               children: [
                 SizedBox(
-                  width: 70,
-                  child: Text(
-                    timeFormatted,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: t.textSecondary,
-                    ),
+                  width: 75,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        timeStr,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: t.textPrimary,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        amPmStr,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: t.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Container(
-                  width: 3,
-                  height: 28,
+                  width: 3.5,
+                  height: 32,
                   decoration: BoxDecoration(
                     color: statusColor,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: statusColor.withValues(alpha: 0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -681,11 +770,13 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                       Text(
                         patientName,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w700,
                           color: t.textPrimary,
+                          letterSpacing: -0.15,
                         ),
                       ),
+                      const SizedBox(height: 2.5),
                       Text(
                         reason,
                         maxLines: 1,
@@ -700,26 +791,25 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    border: Border.all(color: statusColor, width: 1),
-                    borderRadius: BorderRadius.circular(10),
+                    color: statusColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(100),
                   ),
                   child: Text(
-                    statusText,
+                    statusText.toUpperCase(),
                     style: t.monoMeta.copyWith(
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
                       color: statusColor,
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ),
               ],
             ),
           );
-        }).toList(),
+        }),
       ),
     );
   }

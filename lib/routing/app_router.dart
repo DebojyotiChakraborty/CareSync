@@ -285,7 +285,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.doctorHistory,
         name: 'doctorHistory',
-        builder: (context, state) => const PrescriptionHistoryScreen(),
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          final patientId = extras?['patientId'] as String?;
+          final patientName = extras?['patientName'] as String?;
+          return PrescriptionHistoryScreen(
+            patientId: patientId,
+            patientName: patientName,
+          );
+        },
       ),
 
       // Pharmacist Routes

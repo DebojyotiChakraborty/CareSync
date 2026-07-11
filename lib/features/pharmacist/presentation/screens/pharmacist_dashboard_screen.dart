@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:image_picker/image_picker.dart';
@@ -17,11 +19,52 @@ import '../../../../services/custom_biometric_service.dart';
 import '../../../auth/providers/auth_provider.dart';
 
 final pharmacistTodayStatsProvider = FutureProvider<int>((ref) async {
+  final pharmacistId = SupabaseService.instance.currentUserId;
+  if (pharmacistId == null) return 0;
+
+  final channel = SupabaseService.instance.client
+      .channel('pharmacist_dispensing_stats_$pharmacistId')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'dispensing_records',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'pharmacist_id',
+          value: pharmacistId,
+        ),
+        callback: (payload) {
+          ref.invalidateSelf();
+        },
+      );
+
+  channel.subscribe();
+  ref.onDispose(() {
+    SupabaseService.instance.client.removeChannel(channel);
+  });
+
   return await SupabaseService.instance.getTodaysDispensingCount();
 });
 
 final pharmacistPendingPrescriptionsProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final channel = SupabaseService.instance.client
+      .channel('pharmacist_prescriptions_queue')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'prescriptions',
+        callback: (payload) {
+          ref.invalidateSelf();
+          ref.invalidate(pendingPrescriptionsCountProvider);
+        },
+      );
+
+  channel.subscribe();
+  ref.onDispose(() {
+    SupabaseService.instance.client.removeChannel(channel);
+  });
+
   final response = await SupabaseService.instance.client
       .from('prescriptions')
       .select('''
@@ -46,7 +89,9 @@ final recentBiometricLogsProvider =
         .from('biometric_access_logs')
         .select('''
           *,
-          patient_profile:profiles!target_patient_id(full_name)
+          patient:patients!target_patient_id(
+            profiles(full_name)
+          )
         ''')
         .order('created_at', ascending: false)
         .limit(3);
@@ -495,13 +540,16 @@ class _PharmacistDashboardScreenState
                                               log['created_at'] as String)
                                           : DateTime.now();
 
-                                      final targetProfile =
-                                          log['patient_profile']
+                                      final targetPatient =
+                                          log['patient'] as Map<String, dynamic>?;
+                                      final targetProfile = targetPatient != null
+                                          ? targetPatient['profiles']
+                                              as Map<String, dynamic>?
+                                          : log['patient_profile']
                                               as Map<String, dynamic>?;
-                                      final patientName = targetProfile?[
-                                              'full_name'] as String? ??
-                                          log['actor_name'] as String? ??
-                                          'Patient Scan';
+                                      final patientName =
+                                          targetProfile?['full_name'] as String? ??
+                                              'Biometric Scan';
                                       final statusColor =
                                           isSuccess ? t.accent : t.error;
 
@@ -548,10 +596,69 @@ class _PharmacistDashboardScreenState
                                                     ),
                                                     const SizedBox(height: 1),
                                                     Text(
-                                                      log['reason'] as String? ??
-                                                          (isSuccess
-                                                              ? 'Verification successful'
-                                                              : 'Verification failed'),
+                                                      (() {
+                                                        final reasonStr =
+                                                            log['reason']
+                                                                as String?;
+                                                        if (reasonStr != null &&
+                                                            reasonStr
+                                                                .isNotEmpty) {
+                                                          try {
+                                                            final decoded =
+                                                                json.decode(
+                                                                        reasonStr)
+                                                                    as Map<
+                                                                        String,
+                                                                        dynamic>;
+                                                            final msg = decoded[
+                                                                    'message']
+                                                                as String?;
+                                                            final errCode =
+                                                                decoded[
+                                                                        'error_code']
+                                                                    as String?;
+                                                            final isCache =
+                                                                decoded[
+                                                                        'source'] ==
+                                                                    'cache';
+
+                                                            if (errCode ==
+                                                                'SERVER_ERROR') {
+                                                              return 'Internal server error';
+                                                            } else if (msg !=
+                                                                    null &&
+                                                                msg.isNotEmpty) {
+                                                              return msg;
+                                                            } else if (isCache) {
+                                                              return 'Patient identified successfully (cached)';
+                                                            } else if (errCode !=
+                                                                    null &&
+                                                                errCode
+                                                                    .isNotEmpty) {
+                                                              final formatted =
+                                                                  errCode
+                                                                      .replaceAll(
+                                                                          '_',
+                                                                          ' ')
+                                                                      .toLowerCase();
+                                                              if (formatted
+                                                                  .isNotEmpty) {
+                                                                return formatted[0]
+                                                                        .toUpperCase() +
+                                                                    formatted
+                                                                        .substring(
+                                                                            1);
+                                                              }
+                                                              return formatted;
+                                                            }
+                                                          } catch (_) {
+                                                            return reasonStr;
+                                                          }
+                                                        }
+                                                        return isSuccess
+                                                            ? 'Verification successful'
+                                                            : 'Verification failed';
+                                                      })(),
                                                       style: TextStyle(
                                                         fontSize: 10,
                                                         color: t.textSecondary,

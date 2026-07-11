@@ -12,8 +12,12 @@ import '../../../services/auth_controller.dart';
 import '../../shared/models/user_profile.dart';
 
 // ... Providers (authStateProvider, currentProfileProvider, etc.) remain unchanged ...
-final authStateProvider = StreamProvider<User?>((ref) {
-  return SupabaseService.instance.authStateChanges.map((state) => state.session?.user);
+final authStateProvider = StreamProvider<User?>((ref) async* {
+  final supabase = SupabaseService.instance;
+  yield supabase.currentUser;
+  await for (final state in supabase.authStateChanges) {
+    yield state.session?.user;
+  }
 });
 
 final currentProfileProvider = FutureProvider<UserProfile?>((ref) async {

@@ -341,13 +341,17 @@ class SupabaseService {
     String? notes,
     List<String>? itemsDispensed,
   }) async {
-    await client.from('dispensing_records').insert({
-      'prescription_id': prescriptionId,
-      'pharmacist_id': currentUserId,
-      'patient_id': patientId,
-      'dispensed_at': DateTime.now().toIso8601String(),
-      'notes': notes,
-      if (itemsDispensed != null) 'items_dispensed': itemsDispensed,
+    final pharmacistId = currentUserId;
+    if (pharmacistId == null) {
+      throw Exception('User session is invalid. Cannot dispense.');
+    }
+
+    await client.rpc('dispense_prescription_items_v1', params: {
+      'p_prescription_id': prescriptionId,
+      'p_pharmacist_id': pharmacistId,
+      'p_patient_id': patientId,
+      'p_item_ids': itemsDispensed ?? [],
+      'p_notes': notes ?? '',
     });
   }
 

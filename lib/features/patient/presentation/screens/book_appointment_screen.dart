@@ -10,6 +10,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../shared/models/user_profile.dart';
 import '../../providers/appointment_provider.dart';
+import '../../../shared/presentation/screens/notifications_screen.dart';
 
 class BookAppointmentScreen extends ConsumerStatefulWidget {
   const BookAppointmentScreen({super.key});
@@ -205,107 +206,173 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
 
     final availabilityAsync =
         ref.watch(doctorAvailabilityProvider(_selectedDoctor!.id));
+    final bookedAsync = ref.watch(bookedAppointmentsProvider(
+      doctorId: _selectedDoctor!.id,
+      date: _selectedDate,
+    ));
 
-    return availabilityAsync.when(
-      data: (availabilities) {
-        final supabaseDay = _selectedDate.weekday % 7;
-        final dayAvailability =
-            availabilities.where((a) => a.dayOfWeek == supabaseDay).toList();
+    if (availabilityAsync.isLoading || bookedAsync.isLoading) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 28),
+          child: CircularProgressIndicator(strokeWidth: 2, color: t.accent),
+        ),
+      );
+    }
 
+<<<<<<< Updated upstream
         if (dayAvailability.isEmpty) {
           return SquircleCard(
             radius: AppSpacing.squircleGrouped,
             borderSide: BorderSide(color: t.divider),
             padding: const EdgeInsets.symmetric(vertical: 28),
+=======
+    if (availabilityAsync.hasError) {
+      return Center(child: Text('Error: ${availabilityAsync.error}', style: TextStyle(color: t.error)));
+    }
+    if (bookedAsync.hasError) {
+      return Center(child: Text('Error: ${bookedAsync.error}', style: TextStyle(color: t.error)));
+    }
+
+    final availabilities = availabilityAsync.value ?? [];
+    final bookedAppointments = bookedAsync.value ?? [];
+
+    final supabaseDay = _selectedDate.weekday % 7;
+    final dayAvailability =
+        availabilities.where((a) => a.dayOfWeek == supabaseDay).toList();
+
+    if (dayAvailability.isEmpty) {
+      return SquircleCard(
+        radius: AppSpacing.squircleGrouped,
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        child: Column(
+          children: [
+            Icon(Icons.calendar_today_outlined, size: 28, color: t.textSecondary),
+            const SizedBox(height: 10),
+            Text(
+              'No slots available on this day',
+              style: TextStyle(
+                color: t.textSecondary,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Convert booked appointments to formatted strings for comparison
+    final bookedTimes = bookedAppointments.map((appt) {
+      return DateFormat('hh:mm a').format(appt.startTime.toLocal());
+    }).toSet();
+
+    final now = DateTime.now();
+    final isToday = _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
+
+    final slots = <String>[];
+    for (final avail in dayAvailability) {
+      final start = DateFormat('HH:mm:ss').parse(avail.startTime);
+      final end = DateFormat('HH:mm:ss').parse(avail.endTime);
+      var current = DateTime(2000, 1, 1, start.hour, start.minute);
+      final endTime = DateTime(2000, 1, 1, end.hour, end.minute);
+      while (current.isBefore(endTime)) {
+        final slotStr = DateFormat('hh:mm a').format(current);
+        final slotTime = DateTime(
+          _selectedDate.year,
+          _selectedDate.month,
+          _selectedDate.day,
+          current.hour,
+          current.minute,
+        );
+
+        // Only add slot if it is in the future and not already booked
+        if ((!isToday || slotTime.isAfter(now)) && !bookedTimes.contains(slotStr)) {
+          slots.add(slotStr);
+        }
+        current = current.add(const Duration(minutes: 30));
+      }
+    }
+
+    if (slots.isEmpty) {
+      return SquircleCard(
+        radius: AppSpacing.squircleGrouped,
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        child: Column(
+          children: [
+            Icon(Icons.calendar_today_outlined, size: 28, color: t.textSecondary),
+            const SizedBox(height: 10),
+            Text(
+              'All slots booked or passed for this day',
+              style: TextStyle(
+                color: t.textSecondary,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 2.4,
+      ),
+      itemCount: slots.length,
+      itemBuilder: (context, index) {
+        final slot = slots[index];
+        final isSelected = _selectedSlot == slot;
+        final parts = slot.split(' ');
+        final time = parts[0];
+        final period = parts.length > 1 ? parts[1] : '';
+        return GestureDetector(
+          onTap: () => setState(() => _selectedSlot = slot),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            decoration: BoxDecoration(
+              color: isSelected ? t.accent : t.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? t.accent : t.divider,
+                width: 1,
+              ),
+            ),
+>>>>>>> Stashed changes
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.calendar_today_outlined, size: 28, color: t.textSecondary),
-                const SizedBox(height: 10),
                 Text(
-                  'No slots available on this day',
+                  time,
                   style: TextStyle(
-                    color: t.textSecondary,
-                    fontWeight: FontWeight.w500,
+                    color: isSelected ? t.accentOn : t.textPrimary,
+                    fontWeight: FontWeight.w700,
                     fontSize: 13,
+                  ),
+                ),
+                Text(
+                  period,
+                  style: TextStyle(
+                    color: isSelected
+                        ? t.accentOn.withValues(alpha: 0.7)
+                        : t.textSecondary,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 10,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ],
             ),
-          );
-        }
-
-        final slots = <String>[];
-        for (final avail in dayAvailability) {
-          final start = DateFormat('HH:mm:ss').parse(avail.startTime);
-          final end = DateFormat('HH:mm:ss').parse(avail.endTime);
-          var current = DateTime(2000, 1, 1, start.hour, start.minute);
-          final endTime = DateTime(2000, 1, 1, end.hour, end.minute);
-          while (current.isBefore(endTime)) {
-            slots.add(DateFormat('hh:mm a').format(current));
-            current = current.add(const Duration(minutes: 30));
-          }
-        }
-
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 2.4,
           ),
-          itemCount: slots.length,
-          itemBuilder: (context, index) {
-            final slot = slots[index];
-            final isSelected = _selectedSlot == slot;
-            // Split into time and am/pm
-            final parts = slot.split(' ');
-            final time = parts[0];
-            final period = parts.length > 1 ? parts[1] : '';
-            return GestureDetector(
-              onTap: () => setState(() => _selectedSlot = slot),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                decoration: BoxDecoration(
-                  color: isSelected ? t.accent : t.card,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected ? t.accent : t.divider,
-                    width: 1,
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      time,
-                      style: TextStyle(
-                        color: isSelected ? t.accentOn : t.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      period,
-                      style: TextStyle(
-                        color: isSelected
-                            ? t.accentOn.withValues(alpha: 0.7)
-                            : t.textSecondary,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 10,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      error: (err, _) => Text('Error: $err'),
     );
   }
 
@@ -338,6 +405,14 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
             startTime: startTime,
           );
 
+      // Create a local notification for the patient
+      ref.read(notificationsProvider.notifier).addNotification(
+            title: 'Appointment Scheduled',
+            message:
+                'Your appointment with Dr. ${_selectedDoctor!.fullName} is scheduled for ${DateFormat('MMM d, yyyy · hh:mm a').format(startTime)}.',
+            type: 'reminder',
+          );
+
       if (mounted) {
         Navigator.pop(context);
         await showAppSheet<void>(
@@ -362,9 +437,15 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
+        
+        String errorMessage = 'Booking failed: $e';
+        if (e.toString().contains('23505') || e.toString().contains('unique_active_doctor_appointment')) {
+          errorMessage = 'This slot was just booked by another patient. Please choose a different slot.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Booking failed: $e'),
+            content: Text(errorMessage),
             backgroundColor: context.tokens.error,
             behavior: SnackBarBehavior.floating,
           ),

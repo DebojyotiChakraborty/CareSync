@@ -376,26 +376,6 @@ class _DispenseScreenState extends ConsumerState<DispenseScreen> {
         itemsDispensed: selectedItemIds,
       );
 
-      for (final itemId in selectedItemIds) {
-        await SupabaseService.instance.client
-            .from('prescription_items')
-            .update({'is_dispensed': true}).eq('id', itemId);
-      }
-
-      final allItems = prescription['prescription_items'] as List? ?? [];
-      final undispensedItems = allItems.where((item) {
-        final itemId = item['id'] as String;
-        final isNowDispensed = selectedItemIds.contains(itemId);
-        final wasAlreadyDispensed = item['is_dispensed'] as bool? ?? false;
-        return !isNowDispensed && !wasAlreadyDispensed;
-      });
-
-      if (undispensedItems.isEmpty) {
-        await SupabaseService.instance.client
-            .from('prescriptions')
-            .update({'status': 'completed'}).eq('id', prescription['id']);
-      }
-
       if (mounted) {
         _snack('Medications dispensed successfully');
 

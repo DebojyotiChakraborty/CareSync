@@ -14,13 +14,13 @@ import '../../../../routing/route_names.dart';
 
 // Provider for doctor prescriptions list
 final doctorPrescriptionsProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+    FutureProvider.family<List<Map<String, dynamic>>, String?>((ref, patientId) async {
   final supabase = Supabase.instance.client;
   final userId = supabase.auth.currentUser?.id;
 
   if (userId == null) return [];
 
-  final prescriptions = await supabase
+  var query = supabase
       .from('prescriptions')
       .select('''
         *,
@@ -30,27 +30,41 @@ final doctorPrescriptionsProvider =
           profiles!inner(full_name, email)
         )
       ''')
-      .eq('doctor_id', userId)
-      .order('created_at', ascending: false);
+      .eq('doctor_id', userId);
+
+  if (patientId != null && patientId.isNotEmpty) {
+    query = query.eq('patient_id', patientId);
+  }
+
+  final prescriptions = await query.order('created_at', ascending: false);
 
   return List<Map<String, dynamic>>.from(prescriptions);
 });
 
 class PrescriptionHistoryScreen extends ConsumerWidget {
-  const PrescriptionHistoryScreen({super.key});
+  final String? patientId;
+  final String? patientName;
+
+  const PrescriptionHistoryScreen({
+    super.key,
+    this.patientId,
+    this.patientName,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
-    final prescriptionsAsync = ref.watch(doctorPrescriptionsProvider);
+    final prescriptionsAsync = ref.watch(doctorPrescriptionsProvider(patientId));
     final dateFormat = DateFormat('MMM d, yyyy');
 
     return CSScaffold(
-      title: 'Prescription History',
+      title: patientName != null
+          ? '$patientName\'s Prescriptions'
+          : 'Prescription History',
       actions: [
         IconButton(
           icon: Icon(Iconsax.refresh, color: t.textPrimary, size: 18),
-          onPressed: () => ref.invalidate(doctorPrescriptionsProvider),
+          onPressed: () => ref.invalidate(doctorPrescriptionsProvider(patientId)),
         ),
       ],
       body: prescriptionsAsync.when(
@@ -83,7 +97,7 @@ class PrescriptionHistoryScreen extends ConsumerWidget {
                 CSPrimaryButton(
                   label: 'Retry',
                   fullWidth: false,
-                  onPressed: () => ref.invalidate(doctorPrescriptionsProvider),
+                  onPressed: () => ref.invalidate(doctorPrescriptionsProvider(patientId)),
                 ),
               ],
             ),
@@ -95,7 +109,7 @@ class PrescriptionHistoryScreen extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(doctorPrescriptionsProvider),
+            onRefresh: () async => ref.invalidate(doctorPrescriptionsProvider(patientId)),
             color: t.accent,
             child: ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),

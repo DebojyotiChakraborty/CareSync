@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../auth/providers/auth_provider.dart';
 import '../../../services/supabase_service.dart';
@@ -30,6 +31,27 @@ final patientPrescriptionsProvider =
 FutureProvider<List<Prescription>>((ref) async {
   final patientData = await ref.watch(patientDataProvider.future);
   if (patientData == null) return [];
+
+  final channel = SupabaseService.instance.client
+      .channel('patient_prescriptions_${patientData.id}')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'prescriptions',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'patient_id',
+          value: patientData.id,
+        ),
+        callback: (payload) {
+          ref.invalidateSelf();
+        },
+      );
+
+  channel.subscribe();
+  ref.onDispose(() {
+    SupabaseService.instance.client.removeChannel(channel);
+  });
 
   final data =
   await SupabaseService.instance.getPatientPrescriptions(patientData.id);

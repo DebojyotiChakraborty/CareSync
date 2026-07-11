@@ -203,19 +203,309 @@ class _ManageAvailabilityScreenState
   }
 
   Future<void> _addSlot(int dayIndex) async {
-    final pickedTime = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 9, minute: 0),
-    );
+    final t = context.tokens;
+    TimeOfDay fromTime = const TimeOfDay(hour: 9, minute: 0);
+    TimeOfDay uptoTime = const TimeOfDay(hour: 17, minute: 0);
 
-    if (pickedTime != null) {
-      setState(() {
-        if (!_availability[dayIndex]!.contains(pickedTime)) {
-          _availability[dayIndex]!.add(pickedTime);
-          _availability[dayIndex]!.sort((a, b) => a.hour.compareTo(b.hour));
-        }
-      });
-    }
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final startDouble = fromTime.hour + fromTime.minute / 60.0;
+            final endDouble = uptoTime.hour + uptoTime.minute / 60.0;
+            final isValid = endDouble > startDouble;
+
+            List<TimeOfDay> generated = [];
+            if (isValid) {
+              var current = fromTime;
+              while (true) {
+                generated.add(current);
+                var nextHour = current.hour + 1;
+                if (nextHour >= 24) break;
+                final nextTime = TimeOfDay(hour: nextHour, minute: current.minute);
+                final nextDouble = nextTime.hour + nextTime.minute / 60.0;
+                if (nextDouble + 1.0 > endDouble + 0.01) {
+                  break;
+                }
+                current = nextTime;
+              }
+            }
+
+            final slotCount = generated.length;
+
+            return Container(
+              decoration: BoxDecoration(
+                color: t.card,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+              ),
+              padding: EdgeInsets.only(
+                top: 10,
+                left: 24,
+                right: 24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: t.divider,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'Define Availability Frame',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: t.textPrimary,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Select a range to auto-generate hourly timeslots.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: t.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () async {
+                            final time = await showTimePicker(
+                              context: context,
+                              initialTime: fromTime,
+                            );
+                            if (time != null) {
+                              setModalState(() => fromTime = time);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 14, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: t.scaffold,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: t.divider),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'FROM',
+                                  style: TextStyle(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: t.textSecondary,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      fromTime.format(context),
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: t.textPrimary,
+                                      ),
+                                    ),
+                                    Icon(
+                                      Iconsax.clock,
+                                      size: 16,
+                                      color: t.accent,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () async {
+                            final time = await showTimePicker(
+                              context: context,
+                              initialTime: uptoTime,
+                            );
+                            if (time != null) {
+                              setModalState(() => uptoTime = time);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 14, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: t.scaffold,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: t.divider),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'UPTO',
+                                  style: TextStyle(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: t.textSecondary,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      uptoTime.format(context),
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: t.textPrimary,
+                                      ),
+                                    ),
+                                    Icon(
+                                      Iconsax.clock,
+                                      size: 16,
+                                      color: t.accent,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isValid
+                          ? t.accent.withValues(alpha: 0.06)
+                          : t.error.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isValid
+                            ? t.accent.withValues(alpha: 0.2)
+                            : t.error.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isValid ? Iconsax.info_circle : Iconsax.warning_2,
+                          color: isValid ? t.accent : t.error,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            isValid
+                                ? 'Generates $slotCount hourly slot${slotCount == 1 ? '' : 's'} for this day.'
+                                : 'Start time must be before end time.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isValid ? t.textPrimary : t.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: t.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isValid
+                              ? () {
+                                  setState(() {
+                                    for (var slot in generated) {
+                                      if (!_availability[dayIndex]!
+                                          .contains(slot)) {
+                                        _availability[dayIndex]!.add(slot);
+                                      }
+                                    }
+                                    _availability[dayIndex]!.sort(
+                                        (a, b) => a.hour.compareTo(b.hour));
+                                  });
+                                  Navigator.pop(context);
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: t.accent,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: t.divider,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Generate Slots',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _saveAvailability() async {

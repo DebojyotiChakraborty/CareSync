@@ -217,5 +217,67 @@ Future<bool> showBiometricAuthDialog({
   String reason = 'Please authenticate to continue',
   bool allowBiometricOnly = true,
 }) async {
+<<<<<<< Updated upstream
   return true;
+=======
+  try {
+    final isAvailable = await BiometricService.instance.isBiometricAvailable();
+    if (!isAvailable) {
+      if (!context.mounted) return false;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          final t = Theme.of(context);
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Icon(Icons.verified_user, color: t.primaryColor, size: 24),
+                const SizedBox(width: 10),
+                const Text(
+                  'Clinical Signature',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: const Text(
+              'Biometrics are not set up or available on this device. Would you like to digitally sign this prescription using your active clinical session authority?',
+              style: TextStyle(fontSize: 13, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: t.colorScheme.secondary),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: t.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                child: const Text('Confirm & Sign'),
+              ),
+            ],
+          );
+        },
+      );
+      return confirmed ?? false;
+    }
+
+    return await BiometricService.instance.authenticate(
+      reason: reason,
+      biometricOnly: allowBiometricOnly,
+    );
+  } on BiometricException {
+    return false;
+  } catch (_) {
+    return false;
+  }
+>>>>>>> Stashed changes
 }

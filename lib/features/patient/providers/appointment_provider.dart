@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../shared/models/appointment.dart';
 import '../../shared/models/user_profile.dart';
 import '../../../services/appointment_service.dart';
@@ -12,6 +13,24 @@ class Appointments extends _$Appointments {
   FutureOr<List<Appointment>> build() async {
     final userId = SupabaseService.instance.currentUserId;
     if (userId == null) return [];
+    
+    // Subscribe to realtime Postgres changes for appointments
+    final channel = SupabaseService.instance.client
+        .channel('appointments_realtime')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'appointments',
+          callback: (payload) {
+            ref.invalidateSelf();
+          },
+        );
+
+    channel.subscribe();
+
+    ref.onDispose(() {
+      SupabaseService.instance.client.removeChannel(channel);
+    });
     
     return ref.read(appointmentServiceProvider).getUpcomingAppointments(userId);
   }
@@ -61,4 +80,36 @@ Future<List<UserProfile>> availableDoctors(AvailableDoctorsRef ref) async {
 @riverpod
 Future<List<DoctorAvailability>> doctorAvailability(DoctorAvailabilityRef ref, String doctorId) async {
   return ref.read(appointmentServiceProvider).getDoctorAvailability(doctorId);
+}
+
+@riverpod
+Future<List<Appointment>> bookedAppointments(
+  BookedAppointmentsRef ref, {
+  required String doctorId,
+  required DateTime date,
+}) async {
+  final channel = SupabaseService.instance.client
+      .channel('booked_appointments_${doctorId}_${date.year}_${date.month}_${date.day}')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'appointments',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'doctor_id',
+          value: doctorId,
+        ),
+        callback: (payload) {
+          ref.invalidateSelf();
+        },
+      );
+
+  channel.subscribe();
+  ref.onDispose(() {
+    SupabaseService.instance.client.removeChannel(channel);
+  });
+
+  return ref
+      .read(appointmentServiceProvider)
+      .getBookedAppointments(doctorId, date);
 }

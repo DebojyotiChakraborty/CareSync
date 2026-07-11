@@ -149,7 +149,13 @@ class PatientRecordScreen extends ConsumerWidget {
                       _buildSectionLabel(context, 'Prescription History'),
                       GestureDetector(
                         onTap: () {
-                          context.push(RouteNames.doctorHistory);
+                          context.push(
+                            RouteNames.doctorHistory,
+                            extra: {
+                              'patientId': patientId,
+                              'patientName': patientName,
+                            },
+                          );
                         },
                         child: Text(
                           'View All',
@@ -215,11 +221,12 @@ class PatientRecordScreen extends ConsumerWidget {
           Row(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
+                  shape: BoxShape.circle,
                   color: t.tint,
-                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: t.accent.withValues(alpha: 0.15), width: 1.5),
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -227,12 +234,12 @@ class PatientRecordScreen extends ConsumerWidget {
                       0, min(2, patientInitials.length)),
                   style: TextStyle(
                     color: t.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,18 +248,19 @@ class PatientRecordScreen extends ConsumerWidget {
                       name,
                       style: TextStyle(
                         color: t.textPrimary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                        letterSpacing: -0.4,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
-                      'Record ID: ${patient.id.substring(0, 8).toUpperCase()}',
-                      style: t.monoMeta.copyWith(
-                        color: t.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                      'RECORD ID • ${patient.id.substring(0, 8).toUpperCase()}',
+                      style: TextStyle(
+                        color: t.textSecondary.withValues(alpha: 0.7),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
                       ),
                     ),
                   ],
@@ -260,48 +268,25 @@ class PatientRecordScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          Divider(height: 1, color: t.divider.withValues(alpha: 0.5)),
+          const SizedBox(height: 18),
 
           // ── Demographics Grid ──────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: t.scaffold,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: t.divider),
-            ),
-            child: GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 2.8,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 12,
-              children: [
-                _buildInfoGridItem(context, 'Age', ageStr),
-                _buildInfoGridItem(context, 'Gender', genderStr),
-                _buildInfoGridItem(
-                    context, 'Blood Type', patient.bloodType ?? 'N/A'),
-                _buildInfoGridItem(
-                    context,
-                    'Weight',
-                    patient.weight != null
-                        ? "${patient.weight!.toStringAsFixed(0)} kg"
-                        : 'N/A'),
-                _buildInfoGridItem(
-                    context,
-                    'Height',
-                    patient.height != null
-                        ? "${patient.height!.toStringAsFixed(0)} cm"
-                        : 'N/A'),
-                _buildInfoGridItem(
-                    context,
-                    'DOB',
-                    patient.dateOfBirth != null
-                        ? DateFormat('dd MMM yyyy').format(patient.dateOfBirth!)
-                        : 'N/A'),
-              ],
-            ),
+          Row(
+            children: [
+              Expanded(child: _buildInfoGridItem(context, 'Age', ageStr)),
+              Expanded(child: _buildInfoGridItem(context, 'Gender', genderStr)),
+              Expanded(child: _buildInfoGridItem(context, 'Blood Type', patient.bloodType ?? 'N/A')),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: _buildInfoGridItem(context, 'Weight', patient.weight != null ? "${patient.weight!.toStringAsFixed(0)} kg" : 'N/A')),
+              Expanded(child: _buildInfoGridItem(context, 'Height', patient.height != null ? "${patient.height!.toStringAsFixed(0)} cm" : 'N/A')),
+              Expanded(child: _buildInfoGridItem(context, 'DOB', patient.dateOfBirth != null ? DateFormat('dd MMM yyyy').format(patient.dateOfBirth!) : 'N/A')),
+            ],
           ),
 
           // ── Emergency Contact ──────────────────────────────────────────
@@ -369,20 +354,21 @@ class PatientRecordScreen extends ConsumerWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: t.monoMeta.copyWith(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            color: t.textSecondary,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: t.textSecondary.withValues(alpha: 0.7),
             letterSpacing: 0.5,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
             color: t.textPrimary,
+            letterSpacing: -0.2,
           ),
         ),
       ],
@@ -399,34 +385,39 @@ class PatientRecordScreen extends ConsumerWidget {
       grouped.putIfAbsent(v.type, () => []).add(v);
     }
 
-    return Column(
-      children: grouped.entries.map((entry) {
-        final type = entry.key;
-        final list = entry.value.reversed.toList();
-        final latest = entry.value.first;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double itemWidth = (constraints.maxWidth - 12) / 2;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: grouped.entries.map((entry) {
+            final type = entry.key;
+            final list = entry.value.reversed.toList();
+            final latest = entry.value.first;
 
-        // Parse values
-        final values = <double>[];
-        final secondaryValues = <double>[];
+            // Parse values
+            final values = <double>[];
+            final secondaryValues = <double>[];
 
-        for (var v in list) {
-          if (type == 'blood_pressure') {
-            final parts = v.value.split('/');
-            final sys = double.tryParse(parts[0]) ?? 120.0;
-            final dia =
-                parts.length > 1 ? (double.tryParse(parts[1]) ?? 80.0) : 80.0;
-            values.add(sys);
-            secondaryValues.add(dia);
-          } else {
-            final val = double.tryParse(v.value) ?? 0.0;
-            values.add(val);
-          }
-        }
+            for (var v in list) {
+              if (type == 'blood_pressure') {
+                final parts = v.value.split('/');
+                final sys = double.tryParse(parts[0]) ?? 120.0;
+                final dia =
+                    parts.length > 1 ? (double.tryParse(parts[1]) ?? 80.0) : 80.0;
+                values.add(sys);
+                secondaryValues.add(dia);
+              } else {
+                final val = double.tryParse(v.value) ?? 0.0;
+                values.add(val);
+              }
+            }
 
-        // Single accent for all vital charts (flat language).
-        final chartColor = t.accent;
-        final title = type.replaceAll('_', ' ').toUpperCase();
+            final chartColor = t.accent;
+            final title = type.replaceAll('_', ' ').toUpperCase();
 
+<<<<<<< Updated upstream
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: SquircleCard(
@@ -438,87 +429,122 @@ class PatientRecordScreen extends ConsumerWidget {
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+=======
+            return SizedBox(
+              width: itemWidth,
+              height: 112,
+              child: SquircleCard(
+                radius: AppSpacing.squircleGrouped,
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+>>>>>>> Stashed changes
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          title,
-                          style: t.monoMeta.copyWith(
-                            fontSize: 9,
-                            color: t.textSecondary,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: t.textSecondary.withValues(alpha: 0.7),
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      latest.value,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                        color: t.textPrimary,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    latest.unit,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: t.textSecondary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              latest.value,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 18,
-                                color: t.textPrimary,
-                                letterSpacing: -0.5,
-                              ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: t.tint,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${list.length} Log${list.length > 1 ? "s" : ""}',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: t.accent,
+                              fontWeight: FontWeight.w700,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              latest.unit,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: t.textSecondary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: t.tint,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${list.length} Logs',
+                    const SizedBox(height: 12),
+                    if (list.length > 1)
+                      SizedBox(
+                        height: 36,
+                        width: double.infinity,
+                        child: CustomPaint(
+                          painter: _VitalsChartPainter(
+                            values: values,
+                            secondaryValues:
+                                type == 'blood_pressure' ? secondaryValues : null,
+                            color: chartColor,
+                            secondaryColor: type == 'blood_pressure'
+                                ? chartColor.withValues(alpha: 0.45)
+                                : null,
+                            ringColor: t.card,
+                          ),
+                        ),
+                      )
+                    else ...[
+                      const Spacer(),
+                      Text(
+                        'Recorded:\n${DateFormat('dd MMM yyyy, h:mm a').format(latest.createdAt ?? DateTime.now())}',
                         style: TextStyle(
                           fontSize: 10,
-                          color: t.accent,
-                          fontWeight: FontWeight.w700,
+                          color: t.textSecondary.withValues(alpha: 0.8),
+                          fontWeight: FontWeight.w500,
+                          height: 1.3,
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 16),
-                // Inline Line Chart
-                SizedBox(
-                  height: 52,
-                  width: double.infinity,
-                  child: CustomPaint(
-                    painter: _VitalsChartPainter(
-                      values: values,
-                      secondaryValues:
-                          type == 'blood_pressure' ? secondaryValues : null,
-                      color: chartColor,
-                      secondaryColor: type == 'blood_pressure'
-                          ? chartColor.withValues(alpha: 0.45)
-                          : null,
-                      ringColor: t.card,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          }).toList(),
         );
-      }).toList(),
+      },
     );
   }
 
@@ -643,11 +669,11 @@ class PatientRecordScreen extends ConsumerWidget {
     final t = context.tokens;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
-        color: t.scaffold,
+        color: t.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: t.divider),
+        border: Border.all(color: t.divider.withValues(alpha: 0.5)),
       ),
       child: Center(
         child: Text(
@@ -655,7 +681,7 @@ class PatientRecordScreen extends ConsumerWidget {
           style: TextStyle(
             color: t.textSecondary,
             fontSize: 12,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),
@@ -696,7 +722,7 @@ class _VitalsChartPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
+      ..strokeWidth = 1.3
       ..strokeCap = StrokeCap.round;
 
     // Find min and max for scaling
@@ -723,11 +749,15 @@ class _VitalsChartPainter extends CustomPainter {
 
     // Draw main line
     final points = <Offset>[];
-    for (int i = 0; i < values.length; i++) {
-      final x =
-          (values.length > 1) ? (i / (values.length - 1)) * width : width / 2;
-      final y = height - ((values[i] - minVal) / (maxVal - minVal)) * height;
-      points.add(Offset(x, y));
+    if (values.length == 1) {
+      points.add(Offset(0, height / 2));
+      points.add(Offset(width, height / 2));
+    } else {
+      for (int i = 0; i < values.length; i++) {
+        final x = (i / (values.length - 1)) * width;
+        final y = height - ((values[i] - minVal) / (maxVal - minVal)) * height;
+        points.add(Offset(x, y));
+      }
     }
 
     _drawSmoothLine(canvas, points, paint, size, color);
@@ -741,13 +771,16 @@ class _VitalsChartPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round;
 
       final secPoints = <Offset>[];
-      for (int i = 0; i < secondaryValues!.length; i++) {
-        final x = (secondaryValues!.length > 1)
-            ? (i / (secondaryValues!.length - 1)) * width
-            : width / 2;
-        final y = height -
-            ((secondaryValues![i] - minVal) / (maxVal - minVal)) * height;
-        secPoints.add(Offset(x, y));
+      if (secondaryValues!.length == 1) {
+        secPoints.add(Offset(0, height / 2));
+        secPoints.add(Offset(width, height / 2));
+      } else {
+        for (int i = 0; i < secondaryValues!.length; i++) {
+          final x = (i / (secondaryValues!.length - 1)) * width;
+          final y = height -
+              ((secondaryValues![i] - minVal) / (maxVal - minVal)) * height;
+          secPoints.add(Offset(x, y));
+        }
       }
 
       _drawSmoothLine(canvas, secPoints, secPaint, size,

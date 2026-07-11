@@ -42,6 +42,23 @@ class AppointmentService {
     return (response as List).map((json) => Appointment.fromJson(json)).toList();
   }
 
+  Future<List<Appointment>> getBookedAppointments(
+      String doctorId, DateTime date) async {
+    final startOfDay = DateTime(date.year, date.month, date.day).toIso8601String();
+    final endOfDay =
+        DateTime(date.year, date.month, date.day, 23, 59, 59, 999).toIso8601String();
+
+    final response = await _supabase.client
+        .from('appointments')
+        .select()
+        .eq('doctor_id', doctorId)
+        .eq('status', 'scheduled')
+        .gte('start_time', startOfDay)
+        .lte('start_time', endOfDay);
+
+    return (response as List).map((json) => Appointment.fromJson(json)).toList();
+  }
+
   Future<void> bookAppointment({
     required String doctorId,
     required DateTime startTime,
